@@ -1,0 +1,25 @@
+# Python / Flask backend
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.db
+*.pyc
+
+# Env
+.env
+
+# Flutter
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/**/build/
+packages/**/.dart_tool/
+packages/**/build/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+.claude/
