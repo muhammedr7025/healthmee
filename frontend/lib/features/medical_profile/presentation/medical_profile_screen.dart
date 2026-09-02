@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../data/medical_profile_repository.dart';
 import '../domain/medical_profile.dart';
+import 'lab_scan_flow.dart';
 
 const _vitalLabels = {
   'age': 'Age',
@@ -94,6 +95,20 @@ class _ProfileTab extends ConsumerWidget {
         .read(medicalProfileRepositoryProvider)
         .updateProfile(medications: current.where((m) => m != name).toList());
     ref.invalidate(medicalProfileProvider);
+  }
+
+  Future<void> _scanLabReport(BuildContext context, WidgetRef ref) async {
+    final results = await runLabScanFlow(context, ref);
+    if (results == null) return; // user cancelled before picking a photo
+    ref.invalidate(labResultsProvider);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        results.isEmpty
+            ? "Couldn't read any values from that photo — try adding them by hand instead."
+            : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the photo.',
+      ),
+    ));
   }
 
   Future<void> _addLabResult(BuildContext context, WidgetRef ref) async {
@@ -280,6 +295,35 @@ class _ProfileTab extends ConsumerWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Text('Add a lab value by hand', style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted))),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _scanLabReport(context, ref),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.22), style: BorderStyle.solid),
+              borderRadius: BorderRadius.circular(16),
+              color: HealthColors.surface,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(color: HealthColors.chipIdle, borderRadius: BorderRadius.circular(11)),
+                  child: Icon(Icons.document_scanner_outlined, color: HealthColors.accentPrimaryDark, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Snap a new report — I'll extract the values for you to confirm.",
+                    style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted),
+                  ),
+                ),
               ],
             ),
           ),

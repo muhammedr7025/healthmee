@@ -31,6 +31,10 @@ class LabResultSchema(Schema):
     media_asset_id = fields.String(required=False, allow_none=True)
 
 
+class ScanLabReportSchema(Schema):
+    media_asset_id = fields.String(required=True)
+
+
 class GoalIntakeSchema(Schema):
     type = fields.String(required=True)
     target_value = fields.Dict(required=True)

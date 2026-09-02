@@ -54,6 +54,14 @@ class MedicalProfileRepository {
     final resp = await _dio.get('/lab-results');
     return (resp.data as List).map((l) => LabResultData.fromJson(l as Map<String, dynamic>)).toList();
   }
+
+  /// OCR scan of a lab-report photo (already-uploaded media asset id).
+  /// Returns whatever the configured vision provider could read — empty in
+  /// mock mode, since there's no real vision to fall back on.
+  Future<List<LabResultData>> scanLabReport(String mediaAssetId) async {
+    final resp = await _dio.post('/lab-results/scan', data: {'media_asset_id': mediaAssetId});
+    return (resp.data as List).map((l) => LabResultData.fromJson(l as Map<String, dynamic>)).toList();
+  }
 }
 
 final medicalProfileRepositoryProvider = Provider<MedicalProfileRepository>((ref) {

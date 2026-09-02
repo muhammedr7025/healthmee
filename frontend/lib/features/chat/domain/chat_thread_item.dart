@@ -1,4 +1,6 @@
-enum ChatItemKind { userText, assistantReply, alert, extractCard }
+import 'dart:typed_data';
+
+enum ChatItemKind { userText, userPhoto, assistantReply, alert, extractCard }
 
 class ChatThreadItem {
   const ChatThreadItem._({
@@ -10,9 +12,13 @@ class ChatThreadItem {
     this.entryId,
     this.rows = const [],
     this.confirmed = false,
+    this.photoBytes,
   });
 
   factory ChatThreadItem.userText(String text) => ChatThreadItem._(kind: ChatItemKind.userText, text: text);
+
+  factory ChatThreadItem.userPhoto(Uint8List bytes, {String? caption}) =>
+      ChatThreadItem._(kind: ChatItemKind.userPhoto, photoBytes: bytes, text: caption);
 
   factory ChatThreadItem.assistantReply(String text) =>
       ChatThreadItem._(kind: ChatItemKind.assistantReply, text: text);
@@ -46,6 +52,7 @@ class ChatThreadItem {
   final String? entryId;
   final List<MapEntry<String, String>> rows;
   final bool confirmed;
+  final Uint8List? photoBytes;
 
   ChatThreadItem copyWith({String? summary, bool? confirmed}) => ChatThreadItem._(
         kind: kind,
@@ -56,5 +63,6 @@ class ChatThreadItem {
         entryId: entryId,
         rows: rows,
         confirmed: confirmed ?? this.confirmed,
+        photoBytes: photoBytes,
       );
 }

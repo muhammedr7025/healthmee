@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_navigation.dart';
 import '../../goals/presentation/goals_screen.dart';
@@ -256,6 +257,42 @@ class _ThreadItemView extends ConsumerWidget {
           ),
         );
 
+      case ChatItemKind.userPhoto:
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(6),
+                ),
+                child: Image.memory(item.photoBytes!, width: 206, height: 206, fit: BoxFit.cover),
+              ),
+              if (item.text != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+                  decoration: const BoxDecoration(
+                    color: HealthColors.inkPrimary,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                      bottomRight: Radius.circular(6),
+                    ),
+                  ),
+                  child: Text(item.text!, style: HealthTypography.body(color: HealthColors.bgBase, fontSize: 14.5)),
+                ),
+              ],
+            ],
+          ),
+        );
+
       case ChatItemKind.assistantReply:
         return Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -453,13 +490,46 @@ class _CardButton extends StatelessWidget {
   }
 }
 
-class _QuickRepliesAndInput extends StatelessWidget {
+class _QuickRepliesAndInput extends ConsumerWidget {
   const _QuickRepliesAndInput({required this.controller, required this.onSend});
   final TextEditingController controller;
   final void Function([String?]) onSend;
 
+  Future<void> _pickPhoto(BuildContext context, WidgetRef ref) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from library'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+    if (context.mounted) {
+      ref.read(chatControllerProvider.notifier).sendPhoto(bytes, caption: controller.text.trim());
+      controller.clear();
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(HealthSpacing.md, 0, HealthSpacing.md, HealthSpacing.sm),
       child: Column(
@@ -516,8 +586,8 @@ class _QuickRepliesAndInput extends StatelessWidget {
                   icon: Icons.camera_alt_outlined,
                   background: HealthColors.chipIdle,
                   foreground: HealthColors.inkMuted,
-                  tooltip: 'Photo logging — coming soon',
-                  onTap: null,
+                  tooltip: 'Log with a photo',
+                  onTap: () => _pickPhoto(context, ref),
                 ),
                 const SizedBox(width: 6),
                 _RoundIconButton(

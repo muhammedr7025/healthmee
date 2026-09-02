@@ -2,6 +2,7 @@ from flask.views import MethodView
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 
+from app.accounts.data_service import delete_account, export_account_data
 from app.accounts.models import User
 from app.accounts.schemas import LoginSchema, RegisterSchema, TokenSchema, UserSchema
 from app.extensions import db
@@ -43,3 +44,18 @@ class Me(MethodView):
     @blp.response(200, UserSchema)
     def get(self):
         return User.query.get_or_404(get_jwt_identity())
+
+    @jwt_required()
+    @blp.response(204)
+    def delete(self):
+        """Cascade-deletes every row tied to this account. Immediate,
+        irreversible — the client is expected to have its own confirmation
+        step before calling this (Settings "Delete my account and all data")."""
+        delete_account(get_jwt_identity())
+
+
+@blp.route("/me/export")
+class MeExport(MethodView):
+    @jwt_required()
+    def get(self):
+        return export_account_data(get_jwt_identity())

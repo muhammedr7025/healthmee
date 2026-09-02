@@ -72,7 +72,12 @@ services:
   celery_worker:
     build: ./backend
     env_file: .env
-    command: ["celery", "-A", "celery_worker.celery", "worker", "--loglevel=info"]
+    # -B embeds the beat scheduler (push reminders) in the same process as
+    # the worker — fine for this single-instance dev/demo setup. Running
+    # more than one worker replica in production would duplicate every
+    # beat-scheduled task; split beat into its own `celery ... beat` service
+    # at that point.
+    command: ["celery", "-A", "celery_worker.celery", "worker", "-B", "--loglevel=info"]
     depends_on:
       postgres:
         condition: service_healthy

@@ -22,8 +22,26 @@ class LLMProvider(ABC):
     """
 
     @abstractmethod
-    def extract(self, text: str, type_catalog: list[dict]) -> ExtractionResult:
+    def extract(
+        self,
+        text: str,
+        type_catalog: list[dict],
+        image_bytes: bytes | None = None,
+        image_mime_type: str | None = None,
+    ) -> ExtractionResult:
+        """`image_bytes`/`image_mime_type` are set when the message included
+        a photo (VitaChat's photo logging). Providers without vision
+        support can ignore them — MockProvider does, honestly, rather than
+        fabricating what's in a photo it can't see.
+        """
         raise NotImplementedError
+
+    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
+        """OCR lab-report scanning. Default: no capability — mock/text-only
+        providers return nothing rather than inventing lab values. Vision
+        providers override this to return [{test_name, value, unit}, ...].
+        """
+        return []
 
     def narrate(self, prompt: str, stats: dict) -> str:
         """Trends "read" summary (VitaChat's period narrative). Default is a

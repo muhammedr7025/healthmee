@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
 import '../../medical_profile/data/medical_profile_repository.dart';
+import '../../medical_profile/presentation/lab_scan_flow.dart';
 import 'onboarding_controller.dart';
 
 const _conditionOptions = [
@@ -524,7 +525,9 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
   final _valueController = TextEditingController();
   final _unitController = TextEditingController();
   bool _saving = false;
-  bool _saved = false;
+  bool _scanning = false;
+  int _savedCount = 0;
+  String? _scanMessage;
 
   @override
   void dispose() {
@@ -544,11 +547,39 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
             unit: _unitController.text.trim().isEmpty ? null : _unitController.text.trim(),
             takenAt: DateTime.now(),
           );
-      if (mounted) setState(() => _saved = true);
+      if (mounted) {
+        setState(() => _savedCount += 1);
+        _testController.clear();
+        _valueController.clear();
+        _unitController.clear();
+      }
     } catch (_) {
       // Non-blocking — onboarding continues either way.
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _scan() async {
+    setState(() {
+      _scanning = true;
+      _scanMessage = null;
+    });
+    try {
+      final results = await runLabScanFlow(context, ref);
+      if (results == null) return; // cancelled before picking a photo
+      if (mounted) {
+        setState(() {
+          _savedCount += results.length;
+          _scanMessage = results.isEmpty
+              ? "Couldn't read any values from that photo — try typing one in below instead."
+              : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the photo.';
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _scanMessage = "Couldn't scan that photo — please try again.");
+    } finally {
+      if (mounted) setState(() => _scanning = false);
     }
   }
 
@@ -560,11 +591,23 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Photo scanning of lab reports is coming in a later update — for now you can type in one '
-            'value by hand, or skip this entirely and add it from your Medical Profile whenever you like.',
+            'Snap a photo and Mo will pull out what it can read, or type one value in by hand. '
+            'Either way, you can skip this entirely and add it later from your Medical Profile.',
             style: HealthTypography.body(color: HealthColors.inkMuted),
           ),
+          const SizedBox(height: HealthSpacing.md),
+          OutlinedButton.icon(
+            onPressed: _scanning ? null : _scan,
+            icon: const Icon(Icons.camera_alt_outlined, size: 18),
+            label: Text(_scanning ? 'Scanning…' : 'Scan a lab report photo'),
+          ),
+          if (_scanMessage != null) ...[
+            const SizedBox(height: HealthSpacing.sm),
+            Text(_scanMessage!, style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted)),
+          ],
           const SizedBox(height: HealthSpacing.lg),
+          Text('Or add one by hand', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
           TextField(controller: _testController, decoration: const InputDecoration(labelText: 'Test name (e.g. HbA1c)')),
           const SizedBox(height: HealthSpacing.sm),
           Row(
@@ -579,10 +622,12 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
             ],
           ),
           const SizedBox(height: HealthSpacing.md),
-          if (_saved)
-            Text('Saved to your medical profile.', style: HealthTypography.body(color: HealthColors.accentSecondary))
-          else
-            OutlinedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving…' : 'Add this value')),
+          OutlinedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving…' : 'Add this value')),
+          if (_savedCount > 0) ...[
+            const SizedBox(height: HealthSpacing.sm),
+            Text('$_savedCount value${_savedCount == 1 ? '' : 's'} saved to your medical profile.',
+                style: HealthTypography.body(color: HealthColors.accentSecondary)),
+          ],
         ],
       ),
     );

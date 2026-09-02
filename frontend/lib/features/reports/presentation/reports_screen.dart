@@ -1,15 +1,17 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../billing/presentation/paywall_screen.dart';
 import '../../logbook/data/logbook_repository.dart';
 import '../../medical_profile/data/medical_profile_repository.dart';
 import '../../trends/data/trends_repository.dart';
 import '../data/reports_repository.dart';
+import '../domain/generated_report.dart';
 
-enum _ReportStatus { idle, busy, unavailable }
+enum _ReportStatus { idle, busy, error }
 
 const _ranges = [(7, '7 days'), (30, '30 days'), (90, '90 days')];
 final _rangeDaysProvider = StateProvider.autoDispose<int>((ref) => 30);
@@ -43,6 +45,7 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   _ReportStatus _status = _ReportStatus.idle;
   String? _message;
+  GeneratedReport? _lastGenerated;
 
   Future<void> _generate() async {
     setState(() {
@@ -50,20 +53,24 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       _message = null;
     });
     try {
-      await ref.read(reportsRepositoryProvider).requestExport();
-    } catch (e) {
-      String? serverMessage;
-      if (e is DioException) {
-        final data = e.response?.data;
-        if (data is Map && data['message'] is String) serverMessage = data['message'] as String;
-      }
+      final days = ref.read(_rangeDaysProvider);
+      final report = await ref.read(reportsRepositoryProvider).generate(start: DateTime.now().subtract(Duration(days: days)));
       setState(() {
-        _status = _ReportStatus.unavailable;
-        _message = serverMessage ?? "PDF export isn't available yet.";
+        _status = _ReportStatus.idle;
+        _lastGenerated = report;
       });
-      return;
+      ref.invalidate(reportsListProvider);
+    } catch (_) {
+      setState(() {
+        _status = _ReportStatus.error;
+        _message = "Couldn't generate that report — please try again.";
+      });
     }
-    setState(() => _status = _ReportStatus.idle);
+  }
+
+  Future<void> _open(String? url) async {
+    if (url == null) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -101,8 +108,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           const SizedBox(height: HealthSpacing.md),
           _PreviewCard(range: range),
           const SizedBox(height: HealthSpacing.md),
-          if (_status == _ReportStatus.unavailable && _message != null) ...[
+          if (_status == _ReportStatus.error && _message != null) ...[
             AlertBanner(message: _message!, hard: false),
+            const SizedBox(height: HealthSpacing.sm),
+          ],
+          if (_lastGenerated != null) ...[
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF0E2),
+                border: Border.all(color: HealthColors.accentSecondary.withValues(alpha: 0.4)),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, size: 18, color: HealthColors.accentSecondary),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Text(
+                      'Report ready · ${_lastGenerated!.pageCount} page${_lastGenerated!.pageCount == 1 ? '' : 's'}',
+                      style: HealthTypography.body(fontSize: 13.5),
+                    ),
+                  ),
+                  TextButton(onPressed: () => _open(_lastGenerated!.downloadUrl), child: const Text('Open')),
+                ],
+              ),
+            ),
             const SizedBox(height: HealthSpacing.sm),
           ],
           if (_status == _ReportStatus.busy)
@@ -123,6 +154,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: HealthSpacing.lg),
+          Text('PAST REPORTS', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          const _PastReportsList(),
+          const SizedBox(height: HealthSpacing.lg),
           Center(
             child: OutlinedButton(
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen())),
@@ -131,6 +166,69 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PastReportsList extends ConsumerWidget {
+  const _PastReportsList();
+
+  Future<void> _openReport(WidgetRef ref, GeneratedReport report) async {
+    final fresh = await ref.read(reportsRepositoryProvider).refreshDownloadUrl(report.id);
+    if (fresh.downloadUrl != null) {
+      await launchUrl(Uri.parse(fresh.downloadUrl!), mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncReports = ref.watch(reportsListProvider);
+    return asyncReports.when(
+      loading: () => const LinearProgressIndicator(),
+      error: (e, _) => Text("Couldn't load past reports.", style: HealthTypography.body(color: HealthColors.inkMuted)),
+      data: (reports) {
+        if (reports.isEmpty) {
+          return Text('None generated yet.', style: HealthTypography.body(color: HealthColors.inkMuted));
+        }
+        return Column(
+          children: reports
+              .map((r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: HealthColors.surface,
+                        border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${r.rangeStart} to ${r.rangeEnd}', style: HealthTypography.body(fontSize: 13.5)),
+                                Text('${r.pageCount} page${r.pageCount == 1 ? '' : 's'} · ${DateFormat('MMM d').format(DateTime.parse(r.createdAt))}',
+                                    style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkMuted)),
+                              ],
+                            ),
+                          ),
+                          TextButton(onPressed: () => _openReport(ref, r), child: const Text('Open')),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            color: HealthColors.inkFaint,
+                            onPressed: () async {
+                              await ref.read(reportsRepositoryProvider).revoke(r.id);
+                              ref.invalidate(reportsListProvider);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }

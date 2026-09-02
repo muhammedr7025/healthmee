@@ -17,6 +17,12 @@ class Config:
 
     # Object storage (S3-compatible / MinIO)
     S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", "http://localhost:9000")
+    # Host the *client* (Flutter app) can reach, for presigned URLs handed
+    # back to it — inside Docker Compose, S3_ENDPOINT_URL is the internal
+    # `http://minio:9000`, which a mobile simulator/device can't resolve.
+    # Falls back to S3_ENDPOINT_URL when unset (e.g. running the backend
+    # outside Docker, where there's only one reachable host anyway).
+    S3_PUBLIC_ENDPOINT_URL = os.environ.get("S3_PUBLIC_ENDPOINT_URL")
     S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "minioadmin")
     S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "minioadmin")
     S3_BUCKET = os.environ.get("S3_BUCKET", "health-media")
@@ -41,6 +47,13 @@ class Config:
     BILLING_SUCCESS_URL = os.environ.get("BILLING_SUCCESS_URL", "vitachat://billing/success")
     BILLING_CANCEL_URL = os.environ.get("BILLING_CANCEL_URL", "vitachat://billing/cancel")
     FREE_TIER_LOGBOOK_DAYS = int(os.environ.get("FREE_TIER_LOGBOOK_DAYS", 30))
+
+    # Push notifications (Firebase Cloud Messaging). Leave unset to run in
+    # "mock" mode: the reminder scheduler still runs on its real triggers,
+    # but delivery is just a logged PushLog row instead of a real device
+    # push — same fallback pattern as LLM_PROVIDER=mock. Set to a path to a
+    # Firebase service-account JSON file to go live.
+    FCM_CREDENTIALS_JSON = os.environ.get("FCM_CREDENTIALS_JSON")
 
     API_TITLE = "Health API"
     API_VERSION = "v1"

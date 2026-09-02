@@ -22,8 +22,8 @@ class ChatRepository {
 
   final Dio _dio;
 
-  Future<ChatExtractionResult> sendMessage(String text) async {
-    final resp = await _dio.post('/chat/messages', data: {'text': text});
+  Future<ChatExtractionResult> sendMessage(String text, {String? mediaAssetId}) async {
+    final resp = await _dio.post('/chat/messages', data: {'text': text, 'media_asset_id': ?mediaAssetId});
     return ChatExtractionResult.fromJson(resp.data as Map<String, dynamic>);
   }
 

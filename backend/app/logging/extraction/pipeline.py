@@ -3,15 +3,33 @@ from app.common.llm import get_llm_provider
 from app.extensions import db
 from app.logging.models import LogEntry
 from app.logging.registry import get_type, get_type_catalog, validate_payload
+from app.media.models import MediaAsset
+from app.media.storage import download_bytes
 
 
 def process_message(user: User, text: str, media_asset_id: str | None = None) -> dict:
     """LLM extraction -> per-type validation -> per-type handlers, in that
     order (dev-prompt §6). Invalid entries are dropped rather than failing
     the whole message, since a message can contain several loggable things.
+
+    A `media_asset_id` (VitaChat photo logging) is resolved to real image
+    bytes here and handed to the provider's vision path — providers without
+    vision support (MockProvider, or a real provider given a non-image
+    asset) just ignore the bytes and fall back to text-only extraction.
     """
+    image_bytes = None
+    image_mime_type = None
+    if media_asset_id:
+        asset = MediaAsset.query.filter_by(id=media_asset_id, user_id=user.id).first()
+        if asset and asset.kind == "photo":
+            try:
+                image_bytes = download_bytes(asset.storage_key)
+                image_mime_type = asset.content_type
+            except Exception:
+                image_bytes = None  # object storage hiccup — degrade to text-only rather than failing the message
+
     provider = get_llm_provider()
-    result = provider.extract(text, get_type_catalog())
+    result = provider.extract(text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type)
 
     created_entries: list[LogEntry] = []
     all_alerts = []

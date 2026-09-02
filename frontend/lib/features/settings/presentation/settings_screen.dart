@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
@@ -8,10 +11,91 @@ import '../../caregiver/presentation/caregiver_screen.dart';
 import '../../goals/presentation/goals_screen.dart';
 import '../../medical_profile/presentation/medical_profile_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
+import '../data/account_repository.dart';
 import '../data/notification_preferences_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    try {
+      final data = await ref.read(accountRepositoryProvider).exportData();
+      final pretty = const JsonEncoder.withIndent('  ').convert(data);
+      if (!context.mounted) return;
+      Navigator.pop(context); // close the spinner
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Your data'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: SingleChildScrollView(
+              child: SelectableText(pretty, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: pretty));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied to clipboard.')));
+              },
+              child: const Text('Copy'),
+            ),
+            ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't export your data — please try again.")));
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Delete my account and all data'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('This is immediate and irreversible. Type DELETE to confirm.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'DELETE'),
+                onChanged: (_) => setDialogState(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: controller.text.trim() == 'DELETE' ? () => Navigator.pop(context, true) : null,
+              child: const Text('Delete forever'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(accountRepositoryProvider).deleteAccount();
+      await ref.read(authControllerProvider.notifier).logout();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't delete your account — please try again.")));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,8 +145,8 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsRow(
               icon: Icons.download_outlined,
               label: 'Export my data',
-              note: 'Coming soon',
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data export is coming soon.'))),
+              note: 'JSON, shown on screen and copyable',
+              onTap: () => _exportData(context, ref),
             ),
             _SettingsRow(
               icon: Icons.logout,
@@ -71,8 +155,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: HealthSpacing.md),
             GestureDetector(
-              onTap: () =>
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deletion is coming soon.'))),
+              onTap: () => _confirmDelete(context, ref),
               child: Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(

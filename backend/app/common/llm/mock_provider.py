@@ -21,7 +21,13 @@ class MockProvider(LLMProvider):
     configured, so the extraction pipeline is fully exercisable offline.
     """
 
-    def extract(self, text: str, type_catalog: list[dict]) -> ExtractionResult:
+    def extract(
+        self,
+        text: str,
+        type_catalog: list[dict],
+        image_bytes: bytes | None = None,
+        image_mime_type: str | None = None,
+    ) -> ExtractionResult:
         lowered = text.lower()
         entries: list[ExtractedEntry] = []
 
@@ -62,6 +68,12 @@ class MockProvider(LLMProvider):
             )
 
         if not entries:
+            if image_bytes is not None:
+                return ExtractionResult(
+                    entries=[],
+                    reply="I can see a photo came through, but I'm running without a real AI connected "
+                    "right now, so I can't tell what's in it. Describe it in words and I'll log it.",
+                )
             return ExtractionResult(
                 entries=[],
                 reply="Got it — I couldn't quite tell what to log from that. Could you say a bit more?",

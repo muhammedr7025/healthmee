@@ -1,18 +1,22 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from flask_smorest import Blueprint
+from flask_smorest import Blueprint, abort
 
 from app.accounts.models import User
+from app.common.llm import get_llm_provider
 from app.extensions import db
 from app.goals.models import Goal
+from app.media.models import MediaAsset
+from app.media.storage import download_bytes
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.medical_profile.schemas import (
     AllergySchema,
     LabResultSchema,
     MedicalProfileSchema,
     OnboardingSchema,
+    ScanLabReportSchema,
 )
 
 blp = Blueprint(
@@ -147,3 +151,45 @@ class LabResults(MethodView):
         db.session.add(lab_result)
         db.session.commit()
         return lab_result
+
+
+@blp.route("/lab-results/scan")
+class ScanLabReport(MethodView):
+    """OCR lab-report scanning (VitaChat onboarding step 6 / Medical Profile
+    "Snap a new report"). Uses the configured LLM provider's vision path —
+    in mock mode (or against a provider without vision support) this
+    honestly returns zero results rather than inventing lab values.
+    """
+
+    @jwt_required()
+    @blp.arguments(ScanLabReportSchema)
+    @blp.response(201, LabResultSchema(many=True))
+    def post(self, data):
+        user_id = get_jwt_identity()
+        asset = MediaAsset.query.filter_by(id=data["media_asset_id"], user_id=user_id).first_or_404()
+        if asset.kind != "photo":
+            abort(400, message="Lab report scanning needs a photo, not a video.")
+
+        try:
+            image_bytes = download_bytes(asset.storage_key)
+        except Exception:
+            abort(502, message="Couldn't read that photo from storage — please try again.")
+
+        provider = get_llm_provider()
+        found = provider.extract_lab_values(image_bytes, asset.content_type or "image/jpeg")
+
+        results = []
+        for item in found:
+            lab_result = LabResult(
+                user_id=user_id,
+                source="ocr",
+                test_name=item["test_name"],
+                value=str(item["value"]),
+                unit=item.get("unit"),
+                taken_at=datetime.now(timezone.utc),
+                media_asset_id=asset.id,
+            )
+            db.session.add(lab_result)
+            results.append(lab_result)
+        db.session.commit()
+        return results
