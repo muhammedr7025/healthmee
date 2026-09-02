@@ -40,12 +40,32 @@ class HealthTheme {
         foregroundColor: HealthColors.inkPrimary,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
+        // Dark ink-primary pill is VitaChat's dominant CTA (welcome, onboarding
+        // "Continue", "Generate PDF", "Upgrade to Premium"...) — terracotta is
+        // reserved for small accent actions (send, +Add), applied per-widget.
         style: ElevatedButton.styleFrom(
-          backgroundColor: HealthColors.accentPrimary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HealthSpacing.radiusSm)),
+          backgroundColor: HealthColors.inkPrimary,
+          foregroundColor: HealthColors.bgBase,
+          disabledBackgroundColor: HealthColors.chipIdleHover,
+          disabledForegroundColor: HealthColors.inkFaint,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HealthSpacing.radiusSm + 2)),
           padding: const EdgeInsets.symmetric(horizontal: HealthSpacing.lg, vertical: HealthSpacing.sm + 4),
-          textStyle: HealthTypography.body(weight: FontWeight.w600, color: Colors.white),
+          textStyle: HealthTypography.body(weight: FontWeight.w500, color: HealthColors.bgBase),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: HealthColors.inkPrimary,
+          side: BorderSide(color: HealthColors.inkPrimary.withValues(alpha: 0.15)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HealthSpacing.radiusSm + 2)),
+          padding: const EdgeInsets.symmetric(horizontal: HealthSpacing.lg, vertical: HealthSpacing.sm + 4),
+          textStyle: HealthTypography.body(weight: FontWeight.w500),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: HealthColors.inkPrimary,
+          textStyle: HealthTypography.body(weight: FontWeight.w500),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

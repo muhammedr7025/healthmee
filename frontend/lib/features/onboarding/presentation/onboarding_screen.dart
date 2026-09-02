@@ -86,25 +86,57 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(HealthSpacing.lg, HealthSpacing.lg, HealthSpacing.lg, 0),
+              padding: const EdgeInsets.fromLTRB(HealthSpacing.lg, HealthSpacing.md, HealthSpacing.lg, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(_stepLabels[_step], style: HealthTypography.label()),
-                  const SizedBox(height: HealthSpacing.sm),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(
+                      _stepCount,
+                      (i) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Container(
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: i <= _step ? HealthColors.accentPrimary : HealthColors.chipIdleHover,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const MoMascot(state: MascotState.idle, size: 48),
-                      const SizedBox(width: HealthSpacing.sm),
-                      Expanded(child: Text(_prompts[_step], style: HealthTypography.mascotSpeech())),
+                      const MoMascot(state: MascotState.idle, size: 46),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                          decoration: BoxDecoration(
+                            color: HealthColors.surface,
+                            border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(18),
+                              topRight: Radius.circular(18),
+                              bottomRight: Radius.circular(18),
+                              bottomLeft: Radius.circular(5),
+                            ),
+                          ),
+                          child: Text(_prompts[_step], style: HealthTypography.body(fontSize: 15)),
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: HealthSpacing.sm),
-            LinearProgressIndicator(value: (_step + 1) / _stepCount, minHeight: 4),
+            const SizedBox(height: HealthSpacing.md),
             Expanded(
               child: PageView(
                 controller: _pageController,
