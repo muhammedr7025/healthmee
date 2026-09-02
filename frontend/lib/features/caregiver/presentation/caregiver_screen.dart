@@ -138,17 +138,25 @@ class _MyCaregiversTab extends ConsumerWidget {
               final link = links[i];
               return Padding(
                 padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
-                child: HealthCard(
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: HealthColors.surface,
+                    border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Expanded(child: Text(link.caregiverEmail, style: HealthTypography.body(weight: FontWeight.w600))),
+                          _AvatarInitial(text: link.caregiverEmail),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(link.caregiverEmail, style: HealthTypography.body(fontSize: 14.5))),
                           _StatusChip(status: link.status),
                         ],
                       ),
-                      const SizedBox(height: HealthSpacing.xs),
+                      const SizedBox(height: 10),
                       Text(_permissionSummary(link), style: HealthTypography.label()),
                       if (link.status == 'active' || link.status == 'pending')
                         Align(
@@ -274,21 +282,30 @@ class _AccessTab extends ConsumerWidget {
           itemCount: access.length,
           itemBuilder: (context, i) {
             final link = access[i];
+            final name = link.ownerFullName?.isNotEmpty == true ? link.ownerFullName! : (link.ownerEmail ?? '');
             return Padding(
               padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
-              child: HealthCard(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => _OwnerSummaryScreen(link: link)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(link.ownerFullName?.isNotEmpty == true ? link.ownerFullName! : (link.ownerEmail ?? ''),
-                          style: HealthTypography.body(weight: FontWeight.w600)),
+              child: Material(
+                color: HealthColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _OwnerSummaryScreen(link: link))),
+                  child: Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    const Icon(Icons.chevron_right),
-                  ],
+                    child: Row(
+                      children: [
+                        _AvatarInitial(text: name),
+                        const SizedBox(width: 13),
+                        Expanded(child: Text(name, style: HealthTypography.body(fontSize: 14.5))),
+                        Icon(Icons.chevron_right, color: HealthColors.inkFaint),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );
@@ -344,6 +361,22 @@ class _OwnerSummaryScreen extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _AvatarInitial extends StatelessWidget {
+  const _AvatarInitial({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = text.trim().isNotEmpty ? text.trim()[0].toUpperCase() : '?';
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: const BoxDecoration(color: HealthColors.chipIdle, shape: BoxShape.circle),
+      child: Center(child: Text(initial, style: HealthTypography.display(fontSize: 16))),
     );
   }
 }

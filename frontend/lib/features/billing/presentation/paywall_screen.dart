@@ -33,7 +33,6 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       if (url != null) {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } else {
-        // Mock billing mode: the account is already premium server-side.
         setState(() => _message = "You're on Premium now — no card needed in this preview build.");
       }
       ref.invalidate(subscriptionProvider);
@@ -69,46 +68,88 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final asyncSub = ref.watch(subscriptionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Upgrade', style: HealthTypography.display(fontSize: 22))),
-      body: asyncSub.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Padding(
-          padding: const EdgeInsets.all(HealthSpacing.lg),
-          child: AlertBanner(message: "Couldn't load your subscription.", hard: false),
-        ),
-        data: (sub) => SingleChildScrollView(
-          padding: const EdgeInsets.all(HealthSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: asyncSub.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, _) => Padding(
+            padding: const EdgeInsets.all(HealthSpacing.lg),
+            child: AlertBanner(message: "Couldn't load your subscription.", hard: false),
+          ),
+          data: (sub) => ListView(
+            padding: const EdgeInsets.fromLTRB(HealthSpacing.lg, 0, HealthSpacing.lg, HealthSpacing.lg),
             children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: TextButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  child: Text('Not now', style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted)),
+                ),
+              ),
               Center(child: MoMascot(state: sub.isPremium ? MascotState.celebrating : MascotState.idle, size: 96)),
-              const SizedBox(height: HealthSpacing.md),
+              const SizedBox(height: 14),
               Text(
-                sub.isPremium ? "You're on Premium" : 'More room to remember',
-                style: HealthTypography.display(fontSize: 26),
+                sub.isPremium ? "You're on Premium" : 'Let Mo see everything',
+                style: HealthTypography.display(fontSize: 27),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: HealthSpacing.sm),
+              const SizedBox(height: 8),
               Text(
                 sub.isPremium
                     ? 'Thanks for supporting VitaChat — everything below is unlocked.'
-                    : 'Unlock full history, richer logging and doctor-ready reports.',
-                style: HealthTypography.body(color: HealthColors.inkMuted),
+                    : 'Photos, video, full history and the doctor report.',
+                style: HealthTypography.body(fontSize: 13.5, color: HealthColors.inkMuted),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: HealthSpacing.lg),
+              const SizedBox(height: 20),
               ..._premiumFeatures.map((f) => Padding(
-                    padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
+                    padding: const EdgeInsets.only(bottom: 9),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.check_circle, size: 18, color: HealthColors.accentSecondary),
-                        const SizedBox(width: HealthSpacing.sm),
-                        Expanded(child: Text(f, style: HealthTypography.body())),
+                        Container(
+                          width: 18,
+                          height: 18,
+                          margin: const EdgeInsets.only(top: 1),
+                          decoration: const BoxDecoration(color: HealthColors.reactionBubble, shape: BoxShape.circle),
+                          child: Icon(Icons.check, size: 11, color: HealthColors.accentPrimaryDark),
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(child: Text(f, style: HealthTypography.body(fontSize: 13.5))),
                       ],
                     ),
                   )),
-              const SizedBox(height: HealthSpacing.lg),
+              const SizedBox(height: 16),
+              if (!sub.isPremium)
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDEEE4),
+                    border: Border.all(color: HealthColors.accentPrimary, width: 1.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('PREMIUM', style: HealthTypography.label(color: HealthColors.accentPrimaryDark)),
+                            const SizedBox(height: 4),
+                            Text(
+                              sub.billingMode == 'mock' ? 'Free in preview' : 'See pricing at checkout',
+                              style: HealthTypography.display(fontSize: 19),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        sub.billingMode == 'mock' ? 'No card needed' : 'Cancel anytime',
+                        style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
               if (_message != null) ...[
                 AlertBanner(message: _message!, hard: false),
                 const SizedBox(height: HealthSpacing.sm),
@@ -117,19 +158,15 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _working ? null : (sub.isPremium ? _manage : _upgrade),
-                  child: Text(_working
-                      ? 'Please wait…'
-                      : (sub.isPremium ? 'Manage subscription' : 'Upgrade to Premium')),
+                  child: Text(_working ? 'Please wait…' : (sub.isPremium ? 'Manage subscription' : 'Upgrade to Premium')),
                 ),
               ),
-              if (sub.billingMode == 'mock') ...[
-                const SizedBox(height: HealthSpacing.sm),
-                Text(
-                  'Running in preview billing mode — no real payment provider connected yet.',
-                  style: HealthTypography.label(),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              const SizedBox(height: 12),
+              Text(
+                'Cancel anytime; your logs stay yours either way.',
+                style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkFaint),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
