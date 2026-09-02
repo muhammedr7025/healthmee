@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
 import '../features/chat/presentation/chat_screen.dart';
@@ -6,26 +7,22 @@ import '../features/logbook/presentation/logbook_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/today/presentation/today_screen.dart';
 import '../features/trends/presentation/trends_screen.dart';
+import 'app_navigation.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key});
-
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
-
-class _AppShellState extends State<AppShell> {
-  int _index = 0;
 
   static const _screens = [ChatScreen(), TodayScreen(), TrendsScreen(), LogbookScreen(), SettingsScreen()];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(activeTabProvider);
+
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: IndexedStack(index: index, children: _screens),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: index,
+        onDestinationSelected: (i) => ref.read(activeTabProvider.notifier).state = i,
         backgroundColor: HealthColors.bgBase,
         elevation: 0,
         indicatorColor: HealthColors.chipIdle,

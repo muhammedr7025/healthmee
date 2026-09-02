@@ -24,3 +24,13 @@ class LLMProvider(ABC):
     @abstractmethod
     def extract(self, text: str, type_catalog: list[dict]) -> ExtractionResult:
         raise NotImplementedError
+
+    def narrate(self, prompt: str, stats: dict) -> str:
+        """Trends "read" summary (VitaChat's period narrative). Default is a
+        deterministic, no-network sentence built straight from `stats` — the
+        same offline-safe fallback MockProvider gets for free. Real providers
+        override this to turn `prompt` into flowing prose via their API.
+        """
+        from app.common.llm.narrative_fallback import default_narrative
+
+        return default_narrative(stats)

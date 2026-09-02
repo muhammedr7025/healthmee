@@ -36,3 +36,16 @@ class GeminiProvider(LLMProvider):
             for e in data.get("entries", [])
         ]
         return ExtractionResult(entries=entries, reply=data.get("reply", ""))
+
+    def narrate(self, prompt: str, stats: dict) -> str:
+        try:
+            model = self._genai.GenerativeModel(
+                self._model_name,
+                system_instruction="You are Mo, a warm, non-clinical health journal companion. Write 2-4 "
+                "short sentences, plain prose, no markdown, no diagnosis language.",
+            )
+            response = model.generate_content(prompt)
+            text = (response.text or "").strip()
+            return text or super().narrate(prompt, stats)
+        except Exception:
+            return super().narrate(prompt, stats)

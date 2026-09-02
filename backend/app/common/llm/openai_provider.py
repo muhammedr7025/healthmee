@@ -44,3 +44,22 @@ class OpenAIProvider(LLMProvider):
             return ExtractionResult(entries=entries, reply=data.get("reply", ""))
 
         return ExtractionResult(entries=[], reply="Sorry, I couldn't process that message.")
+
+    def narrate(self, prompt: str, stats: dict) -> str:
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are Mo, a warm, non-clinical health journal companion. Write 2-4 "
+                        "short sentences, plain prose, no markdown, no diagnosis language.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=400,
+            )
+            text = (response.choices[0].message.content or "").strip()
+            return text or super().narrate(prompt, stats)
+        except Exception:
+            return super().narrate(prompt, stats)

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/app_navigation.dart';
+import '../../reports/presentation/reports_screen.dart';
 import '../../today/domain/daily_aggregate.dart';
 import '../data/trends_repository.dart';
 
@@ -25,6 +27,7 @@ final _metrics = [
 ];
 
 final _selectedMetricProvider = StateProvider<String>((ref) => 'calories');
+final _trendsViewProvider = StateProvider.autoDispose<String>((ref) => 'charts'); // charts|read
 
 class TrendsScreen extends ConsumerWidget {
   const TrendsScreen({super.key});
@@ -32,6 +35,7 @@ class TrendsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncTrends = ref.watch(trendsDataProvider);
+    final view = ref.watch(_trendsViewProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -58,8 +62,74 @@ class TrendsScreen extends ConsumerWidget {
                 ),
               );
             }
-            return _TrendsBody(trends: trends);
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.sm, HealthSpacing.md, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Trends', style: HealthTypography.display(fontSize: 27)),
+                      const SizedBox(height: 4),
+                      Text('Last ${trends.days.length} days', style: HealthTypography.body(fontSize: 12, color: HealthColors.inkMuted)),
+                      const SizedBox(height: 13),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(color: HealthColors.chipIdle, borderRadius: BorderRadius.circular(14)),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _ViewTab(
+                                label: 'Charts',
+                                selected: view == 'charts',
+                                onTap: () => ref.read(_trendsViewProvider.notifier).state = 'charts',
+                              ),
+                            ),
+                            Expanded(
+                              child: _ViewTab(
+                                label: 'Read',
+                                selected: view == 'read',
+                                onTap: () => ref.read(_trendsViewProvider.notifier).state = 'read',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: view == 'charts' ? _TrendsBody(trends: trends) : const _ReadView()),
+              ],
+            );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewTab extends StatelessWidget {
+  const _ViewTab({required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? HealthColors.inkPrimary : Colors.transparent,
+      borderRadius: BorderRadius.circular(11),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(11),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Center(
+            child: Text(
+              label,
+              style: HealthTypography.body(fontSize: 12.5, weight: FontWeight.w500, color: selected ? HealthColors.bgBase : HealthColors.inkMuted),
+            ),
+          ),
         ),
       ),
     );
@@ -80,12 +150,8 @@ class _TrendsBody extends ConsumerWidget {
     final delta = present.length >= 2 ? present.last - present.first : 0.0;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.sm, HealthSpacing.md, HealthSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, HealthSpacing.lg),
       children: [
-        Text('Trends', style: HealthTypography.display(fontSize: 27)),
-        const SizedBox(height: 4),
-        Text('Last ${trends.days.length} days', style: HealthTypography.body(fontSize: 12, color: HealthColors.inkMuted)),
-        const SizedBox(height: 13),
         SizedBox(
           height: 40,
           child: ListView(
@@ -217,6 +283,214 @@ class _TrendsBody extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+const _periods = [('today', 'Today'), ('week', 'Week'), ('month', 'Month')];
+
+class _ReadView extends ConsumerWidget {
+  const _ReadView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final period = ref.watch(narrativePeriodProvider);
+    final asyncNarrative = ref.watch(narrativeProvider);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, 0),
+          child: Row(
+            children: _periods
+                .map((p) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: _ViewTab(
+                          label: p.$2,
+                          selected: period == p.$1,
+                          onTap: () => ref.read(narrativePeriodProvider.notifier).state = p.$1,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+        Expanded(
+          child: asyncNarrative.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(HealthSpacing.lg),
+              child: AlertBanner(message: "Couldn't load your summary.", hard: false),
+            ),
+            data: (narrative) => ListView(
+              padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, HealthSpacing.lg),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(17),
+                  decoration: BoxDecoration(
+                    color: HealthColors.surface,
+                    border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const MoMascot(state: MascotState.remembering, size: 42),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Your ${period == 'today' ? "today" : period} in review',
+                                    style: HealthTypography.body(fontSize: 14, weight: FontWeight.w500)),
+                                Text('${narrative.start} to ${narrative.end}',
+                                    style: HealthTypography.body(fontSize: 11, color: HealthColors.inkFaint)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 13),
+                      Text(narrative.summary, style: HealthTypography.body(fontSize: 14, color: const Color(0xFF332C25))),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 9,
+                  crossAxisSpacing: 9,
+                  childAspectRatio: 2.1,
+                  children: [
+                    _StatTile(label: 'Days logged', value: '${narrative.stats.daysLogged}/${narrative.stats.daysTotal}'),
+                    _StatTile(label: 'Entries', value: '${narrative.stats.logCount}'),
+                    if (narrative.stats.avgSleep != null)
+                      _StatTile(label: 'Avg sleep', value: '${narrative.stats.avgSleep!.toStringAsFixed(1)}h'),
+                    if (narrative.stats.avgMood != null)
+                      _StatTile(label: 'Avg mood', value: '${narrative.stats.avgMood!.toStringAsFixed(1)}/5'),
+                  ],
+                ),
+                if (narrative.wins.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _CalloutBox(
+                    label: 'GOING WELL',
+                    labelColor: HealthColors.accentSecondary,
+                    bg: const Color(0xFFEEF0E2),
+                    borderColor: HealthColors.accentSecondary.withValues(alpha: 0.35),
+                    textColor: const Color(0xFF3C4A33),
+                    items: narrative.wins,
+                  ),
+                ],
+                if (narrative.watch.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  _CalloutBox(
+                    label: 'WORTH A LOOK',
+                    labelColor: HealthColors.accentPrimaryDark,
+                    bg: const Color(0xFFFDEEE4),
+                    borderColor: HealthColors.accentPrimary.withValues(alpha: 0.3),
+                    textColor: HealthColors.reactionText,
+                    items: narrative.watch,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ref.read(pendingChatMessageProvider.notifier).state =
+                              'Explain my ${period == 'today' ? "today's" : "$period's"} summary';
+                          ref.read(activeTabProvider.notifier).state = chatTabIndex;
+                        },
+                        child: const Text('Ask Mo about this'),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                    OutlinedButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+                      child: const Text('Export'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Mo reads patterns in your own logs. It is not a diagnosis, and it doesn\'t replace your doctor.',
+                  style: HealthTypography.body(fontSize: 11, color: HealthColors.inkFaint),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      decoration: BoxDecoration(
+        color: HealthColors.surface,
+        border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label, style: HealthTypography.label(fontSize: 10)),
+          const SizedBox(height: 3),
+          Text(value, style: HealthTypography.display(fontSize: 19)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalloutBox extends StatelessWidget {
+  const _CalloutBox({
+    required this.label,
+    required this.labelColor,
+    required this.bg,
+    required this.borderColor,
+    required this.textColor,
+    required this.items,
+  });
+  final String label;
+  final Color labelColor;
+  final Color bg;
+  final Color borderColor;
+  final Color textColor;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: bg, border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(18)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: HealthTypography.label(color: labelColor)),
+          const SizedBox(height: 8),
+          ...items.map((w) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(w, style: HealthTypography.body(fontSize: 13, color: textColor)),
+              )),
+        ],
+      ),
     );
   }
 }

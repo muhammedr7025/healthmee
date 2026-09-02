@@ -8,6 +8,7 @@ import '../../caregiver/presentation/caregiver_screen.dart';
 import '../../goals/presentation/goals_screen.dart';
 import '../../medical_profile/presentation/medical_profile_screen.dart';
 import '../../reports/presentation/reports_screen.dart';
+import '../data/notification_preferences_repository.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -51,6 +52,10 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsRow(icon: Icons.workspace_premium_outlined, label: 'Upgrade to Premium', note: 'Unlimited history and more',
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen()))),
             const SizedBox(height: HealthSpacing.lg),
+            Text('REMINDERS', style: HealthTypography.label()),
+            const SizedBox(height: 9),
+            const _RemindersCard(),
+            const SizedBox(height: HealthSpacing.lg),
             Text('DATA', style: HealthTypography.label()),
             const SizedBox(height: 9),
             _SettingsRow(
@@ -90,6 +95,89 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RemindersCard extends ConsumerWidget {
+  const _RemindersCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncPrefs = ref.watch(notificationPreferencesProvider);
+
+    return asyncPrefs.when(
+      loading: () => const HealthCard(child: LinearProgressIndicator()),
+      error: (e, _) => Text("Couldn't load reminder settings.", style: HealthTypography.body(color: HealthColors.inkMuted)),
+      data: (prefs) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: HealthColors.surface,
+          border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          children: [
+            _ReminderToggle(
+              label: 'Medication times',
+              note: 'Nudge me when it\'s time to take something',
+              value: prefs.medicationReminders,
+              onChanged: (v) async {
+                await ref.read(notificationPreferencesRepositoryProvider).update(medicationReminders: v);
+                ref.invalidate(notificationPreferencesProvider);
+              },
+            ),
+            const Divider(height: 24),
+            _ReminderToggle(
+              label: 'Nudge me if I go quiet',
+              note: 'Once a day, never twice',
+              value: prefs.quietNudges,
+              onChanged: (v) async {
+                await ref.read(notificationPreferencesRepositoryProvider).update(quietNudges: v);
+                ref.invalidate(notificationPreferencesProvider);
+              },
+            ),
+            const Divider(height: 24),
+            _ReminderToggle(
+              label: 'Streaks and milestones',
+              note: 'Turn off for a quieter app',
+              value: prefs.streakMilestones,
+              onChanged: (v) async {
+                await ref.read(notificationPreferencesRepositoryProvider).update(streakMilestones: v);
+                ref.invalidate(notificationPreferencesProvider);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderToggle extends StatelessWidget {
+  const _ReminderToggle({required this.label, required this.note, required this.value, required this.onChanged});
+  final String label;
+  final String note;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        HealthSwitch(value: value, onChanged: onChanged),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: HealthTypography.body(fontSize: 13.5)),
+              const SizedBox(height: 2),
+              Text(note, style: HealthTypography.body(fontSize: 11, color: HealthColors.inkFaint)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ export 'src/tokens/health_spacing.dart';
 export 'src/tokens/health_theme.dart';
 
 export 'src/components/health_card.dart';
+export 'src/components/health_switch.dart';
 export 'src/components/log_confirmation_card.dart';
 export 'src/components/alert_banner.dart';
 

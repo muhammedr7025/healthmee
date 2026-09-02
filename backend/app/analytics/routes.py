@@ -5,7 +5,14 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
 
 from app.analytics.models import DailyAggregate
-from app.analytics.schemas import DailyAggregateSchema, TrendsQuerySchema, TrendsResponseSchema
+from app.analytics.narrative import build_period_narrative
+from app.analytics.schemas import (
+    DailyAggregateSchema,
+    NarrativeQuerySchema,
+    NarrativeResponseSchema,
+    TrendsQuerySchema,
+    TrendsResponseSchema,
+)
 
 blp = Blueprint("analytics", __name__, url_prefix="/api/v1", description="Today summary & trends")
 
@@ -29,6 +36,22 @@ class Today(MethodView):
                 "log_count": 0,
             }
         return aggregate
+
+
+@blp.route("/trends/narrative")
+class TrendsNarrative(MethodView):
+    """The "read" tab (VitaChat Trends): an LLM-written reflection of the
+    period's real stats. Deterministic (no network call) in mock mode —
+    same offline-safe contract as chat extraction.
+    """
+
+    @jwt_required()
+    @blp.arguments(NarrativeQuerySchema, location="query")
+    @blp.response(200, NarrativeResponseSchema)
+    def get(self, args):
+        return build_period_narrative(
+            get_jwt_identity(), args["period"], args.get("start"), args.get("end")
+        )
 
 
 @blp.route("/trends")

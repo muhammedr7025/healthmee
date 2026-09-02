@@ -32,3 +32,17 @@ class AnthropicProvider(LLMProvider):
                 return ExtractionResult(entries=entries, reply=data.get("reply", ""))
 
         return ExtractionResult(entries=[], reply="Sorry, I couldn't process that message.")
+
+    def narrate(self, prompt: str, stats: dict) -> str:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=400,
+                system="You are Mo, a warm, non-clinical health journal companion. Write 2-4 short "
+                "sentences, plain prose, no markdown, no diagnosis language, first person plural avoided.",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = "".join(b.text for b in response.content if b.type == "text").strip()
+            return text or super().narrate(prompt, stats)
+        except Exception:
+            return super().narrate(prompt, stats)

@@ -1,6 +1,12 @@
 from marshmallow import Schema, fields
 
 
+class NotificationPreferenceSchema(Schema):
+    medication_reminders = fields.Boolean()
+    quiet_nudges = fields.Boolean()
+    streak_milestones = fields.Boolean()
+
+
 class AlertLogSchema(Schema):
     id = fields.String(dump_only=True)
     log_entry_id = fields.String(dump_only=True, allow_none=True)

@@ -2,6 +2,29 @@ from app.common.models import TimestampMixin, gen_uuid
 from app.extensions import db
 
 
+class NotificationPreference(db.Model, TimestampMixin):
+    """Stored toggles only — there's no push-delivery mechanism (device
+    token registration, APNs/FCM, a scheduled sender) wired up yet, same as
+    photo/video logging: honestly scaffolded, not yet delivering.
+    """
+
+    __tablename__ = "notification_preferences"
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, unique=True, index=True)
+
+    medication_reminders = db.Column(db.Boolean, nullable=False, default=True)
+    quiet_nudges = db.Column(db.Boolean, nullable=False, default=True)
+    streak_milestones = db.Column(db.Boolean, nullable=False, default=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "medication_reminders": self.medication_reminders,
+            "quiet_nudges": self.quiet_nudges,
+            "streak_milestones": self.streak_milestones,
+        }
+
+
 class AlertLog(db.Model, TimestampMixin):
     __tablename__ = "alert_logs"
 

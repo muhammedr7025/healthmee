@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
+import '../../../core/app_navigation.dart';
 import '../../goals/presentation/goals_screen.dart';
 import '../../today/domain/streak.dart';
 import '../../trends/data/trends_repository.dart';
@@ -48,6 +49,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final chatState = ref.watch(chatControllerProvider);
     final asyncTrends = ref.watch(trendsDataProvider);
     final streak = asyncTrends.maybeWhen(data: computeStreak, orElse: () => 0);
+
+    // Other tabs (e.g. Trends' "Ask Mo about this") queue a message here.
+    ref.listen<String?>(pendingChatMessageProvider, (previous, next) {
+      if (next != null) {
+        ref.read(pendingChatMessageProvider.notifier).state = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _send(next));
+      }
+    });
 
     return Scaffold(
       body: SafeArea(

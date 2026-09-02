@@ -44,32 +44,29 @@ class _MyCaregiversTab extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Their email')),
-            const SizedBox(height: HealthSpacing.sm),
+            const SizedBox(height: HealthSpacing.md),
             ValueListenableBuilder(
               valueListenable: canViewLogs,
-              builder: (context, v, _) => CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
+              builder: (context, v, _) => _PermissionRow(
+                label: 'Log food, vitals and medication',
                 value: v,
-                onChanged: (nv) => canViewLogs.value = nv ?? true,
-                title: const Text('Log food, vitals and medication'),
+                onChanged: (nv) => canViewLogs.value = nv,
               ),
             ),
             ValueListenableBuilder(
               valueListenable: canViewTrends,
-              builder: (context, v, _) => CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
+              builder: (context, v, _) => _PermissionRow(
+                label: 'See trends and reports',
                 value: v,
-                onChanged: (nv) => canViewTrends.value = nv ?? true,
-                title: const Text('See trends and reports'),
+                onChanged: (nv) => canViewTrends.value = nv,
               ),
             ),
             ValueListenableBuilder(
               valueListenable: canEditProfile,
-              builder: (context, v, _) => CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
+              builder: (context, v, _) => _PermissionRow(
+                label: 'Edit the medical profile',
                 value: v,
-                onChanged: (nv) => canEditProfile.value = nv ?? false,
-                title: const Text('Edit the medical profile'),
+                onChanged: (nv) => canEditProfile.value = nv,
               ),
             ),
           ],
@@ -157,7 +154,30 @@ class _MyCaregiversTab extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Text(_permissionSummary(link), style: HealthTypography.label()),
+                      _PermissionRow(
+                        label: 'Log food, vitals and medication',
+                        value: link.canViewLogs,
+                        onChanged: (v) async {
+                          await ref.read(caregiverRepositoryProvider).updatePermissions(link.id, canViewLogs: v);
+                          ref.invalidate(caregiverLinksProvider);
+                        },
+                      ),
+                      _PermissionRow(
+                        label: 'See trends and reports',
+                        value: link.canViewTrendsReports,
+                        onChanged: (v) async {
+                          await ref.read(caregiverRepositoryProvider).updatePermissions(link.id, canViewTrendsReports: v);
+                          ref.invalidate(caregiverLinksProvider);
+                        },
+                      ),
+                      _PermissionRow(
+                        label: 'Edit the medical profile',
+                        value: link.canEditProfile,
+                        onChanged: (v) async {
+                          await ref.read(caregiverRepositoryProvider).updatePermissions(link.id, canEditProfile: v);
+                          ref.invalidate(caregiverLinksProvider);
+                        },
+                      ),
                       if (link.status == 'active' || link.status == 'pending')
                         Align(
                           alignment: Alignment.centerRight,
@@ -180,13 +200,6 @@ class _MyCaregiversTab extends ConsumerWidget {
     );
   }
 
-  String _permissionSummary(CaregiverLink link) {
-    final parts = <String>[];
-    if (link.canViewLogs) parts.add('Logs');
-    if (link.canViewTrendsReports) parts.add('Trends & reports');
-    if (link.canEditProfile) parts.add('Edit profile');
-    return parts.isEmpty ? 'No access granted' : parts.join(' · ');
-  }
 }
 
 class _InvitationsTab extends ConsumerWidget {
@@ -360,6 +373,27 @@ class _OwnerSummaryScreen extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _PermissionRow extends StatelessWidget {
+  const _PermissionRow({required this.label, required this.value, required this.onChanged});
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          HealthSwitch(value: value, onChanged: onChanged),
+          const SizedBox(width: 11),
+          Expanded(child: Text(label, style: HealthTypography.body(fontSize: 13.5))),
+        ],
       ),
     );
   }
