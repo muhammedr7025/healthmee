@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:health_ui/health_ui.dart';
 
 void main() {
-  testWidgets('KunjanMascot renders in every named state', (tester) async {
+  testWidgets('MoMascot renders in every named state', (tester) async {
     for (final state in MascotState.values) {
       await tester.pumpWidget(
-        MaterialApp(theme: HealthTheme.light(), home: Scaffold(body: KunjanMascot(state: state))),
+        MaterialApp(theme: HealthTheme.light(), home: Scaffold(body: MoMascot(state: state))),
       );
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.byType(KunjanMascot), findsOneWidget);
+      expect(find.byType(MoMascot), findsOneWidget);
     }
   });
 

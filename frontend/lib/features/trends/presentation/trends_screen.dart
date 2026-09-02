@@ -29,7 +29,7 @@ class TrendsScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const KunjanMascot(state: MascotState.idle, size: 96),
+                    const MoMascot(state: MascotState.idle, size: 96),
                     const SizedBox(height: HealthSpacing.md),
                     Text('Log a few days and trends will start showing up here.',
                         style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
@@ -47,7 +47,7 @@ class TrendsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
                   child: Row(
                     children: [
-                      const KunjanMascot(state: MascotState.remembering, size: 40),
+                      const MoMascot(state: MascotState.remembering, size: 40),
                       const SizedBox(width: HealthSpacing.sm),
                       Expanded(child: Text(trends.callouts.first, style: HealthTypography.mascotSpeech(fontSize: 14))),
                     ],

@@ -53,9 +53,9 @@ class LogbookScreen extends ConsumerWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const KunjanMascot(state: MascotState.idle, size: 96),
+                          const MoMascot(state: MascotState.idle, size: 96),
                           const SizedBox(height: HealthSpacing.md),
-                          Text('Nothing here yet — start a conversation with Kunjan.',
+                          Text('Nothing here yet — start a conversation with Mo.',
                               style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
                         ],
                       ),

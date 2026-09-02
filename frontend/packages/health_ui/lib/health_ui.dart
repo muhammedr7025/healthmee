@@ -10,7 +10,7 @@ export 'src/components/log_confirmation_card.dart';
 export 'src/components/alert_banner.dart';
 
 export 'src/mascot/mascot_state.dart';
-export 'src/mascot/kunjan_mascot.dart';
+export 'src/mascot/mo_mascot.dart';
 
 export 'src/memory_trail/memory_trail_painter.dart';
 export 'src/memory_trail/memory_trail_timeline.dart';

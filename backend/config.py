@@ -31,6 +31,17 @@ class Config:
     GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
     GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-1.5-flash")
 
+    # Billing / subscriptions (Stripe). With no STRIPE_SECRET_KEY set, billing
+    # runs in "mock" mode: checkout instantly marks the account premium and no
+    # network calls are made — same fallback pattern as LLM_PROVIDER=mock.
+    STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY")
+    STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
+    STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+    BILLING_SUCCESS_URL = os.environ.get("BILLING_SUCCESS_URL", "vitachat://billing/success")
+    BILLING_CANCEL_URL = os.environ.get("BILLING_CANCEL_URL", "vitachat://billing/cancel")
+    FREE_TIER_LOGBOOK_DAYS = int(os.environ.get("FREE_TIER_LOGBOOK_DAYS", 30))
+
     API_TITLE = "Health API"
     API_VERSION = "v1"
     OPENAPI_VERSION = "3.0.3"

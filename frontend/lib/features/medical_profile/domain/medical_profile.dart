@@ -25,6 +25,33 @@ class MedicalProfileData {
       );
 }
 
+class LabResultData {
+  const LabResultData({
+    required this.id,
+    required this.source,
+    required this.testName,
+    required this.value,
+    this.unit,
+    required this.takenAt,
+  });
+
+  final String id;
+  final String source;
+  final String testName;
+  final String value;
+  final String? unit;
+  final DateTime takenAt;
+
+  factory LabResultData.fromJson(Map<String, dynamic> json) => LabResultData(
+        id: json['id'] as String,
+        source: json['source'] as String,
+        testName: json['test_name'] as String,
+        value: json['value'] as String,
+        unit: json['unit'] as String?,
+        takenAt: DateTime.parse(json['taken_at'] as String),
+      );
+}
+
 class AllergyData {
   const AllergyData({required this.id, required this.name, required this.severity});
 

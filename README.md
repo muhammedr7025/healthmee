@@ -1,33 +1,40 @@
-# Health
+# VitaChat
 
 A chat-first, multimodal health & wellness journal. Users log their day via text (photo/video coming in a later
-phase), and an AI extracts structured data (food, sleep, mood, activity, stress, symptoms) behind a warm
-conversational reply, cross-checked against a persistent medical profile in real time (e.g. allergy alerts).
+phase), and Mo — the app's mascot and AI — extracts structured data (food, sleep, mood, activity, stress,
+symptoms) behind a warm conversational reply, cross-checked against a persistent medical profile in real time
+(e.g. allergy alerts).
 
 See [`PRD-health-wellness-chat-app.md`](PRD-health-wellness-chat-app.md) for product scope and
 [`Development-Prompt-Health-App.md`](Development-Prompt-Health-App.md) for the design/architecture brief this build
-follows.
+follows. Visual design (palette, type, screen flows) follows the "Warm Paper" VitaChat prototype
+(`Baby elephant mobile app design.zip` — a Claude Design canvas export).
 
 **Stack:** Flutter (frontend) + Python Flask (backend: Flask-Smorest, SQLAlchemy, Celery, PostgreSQL, Redis,
-S3-compatible object storage via MinIO).
+S3-compatible object storage via MinIO, Stripe for billing).
 
 ## What's built (this pass)
 
-Foundation + Phase 1 MVP: onboarding, medical profile (versioned), text-based chat logging with pluggable
-LLM extraction (Anthropic / OpenAI / Gemini, or a zero-key mock extractor), real-time allergy alerts, Today
-summary, Trends with a lightweight sleep/mood correlation call-out, Logbook, and Goals.
+Foundation + Phase 1 MVP, plus caregiver mode and subscriptions: onboarding (basics, conditions, allergies,
+medications, baseline vitals, one manual lab value, goals, privacy), medical profile (versioned), text-based
+chat logging with pluggable LLM extraction (Anthropic / OpenAI / Gemini, or a zero-key mock extractor),
+real-time allergy alerts, Today summary, Trends with a lightweight sleep/mood correlation call-out, Logbook,
+Goals, **caregiver mode** (invite by email, permission-scoped read access to logs/trends/profile), and
+**subscriptions** (Stripe Checkout + billing portal, or a zero-key "mock" mode that upgrades instantly for
+local dev/demo — same pluggable-provider pattern as the LLM extractor). The free tier caps Logbook history at
+30 days (`FREE_TIER_LOGBOOK_DAYS`); Premium removes the cap.
 
-**Deferred to later phases** (per the PRD roadmap): photo/video logging, OCR lab-report scanning, PDF report
-export, caregiver mode, proactive weekly check-ins, B2B/clinic layer. The chat input bar and Settings screen
-already have placeholders for these so they can be wired in without restructuring.
+**Deferred to later phases** (per the PRD roadmap): photo/video logging, OCR lab-report scanning (the
+onboarding lab step and Medical Profile still take one value by hand), PDF report export (the Reports screen
+explains this and links to Premium), proactive weekly check-ins, B2B/clinic layer.
 
 ## Repo layout
 
 ```
 backend/            Flask API (domain-separated packages: accounts, medical_profile, logging, analytics,
-                     goals, media, notifications, reports)
+                     goals, media, notifications, reports, caregiver, billing)
 frontend/            Flutter app
-  packages/health_ui/  Shared design system package (tokens, mascot widget, Memory Trail component)
+  packages/health_ui/  Shared design system package (tokens, MoMascot widget, Memory Trail component)
 docker-compose.yml    Postgres + Redis + MinIO + backend API + Celery worker
 .env.example          Copy to .env and fill in before running docker compose
 ```
@@ -41,13 +48,12 @@ cp .env.example .env   # already done if you're reading this after setup
 docker compose up --build
 ```
 
-This starts Postgres, Redis, MinIO (with the `health-media` bucket auto-created), the Flask API on
-`:5000`, and a Celery worker. The API container runs `flask db upgrade` on startup via `entrypoint.sh`.
+This starts Postgres, Redis, MinIO (with the `health-media` bucket auto-created), the Flask API, and a Celery
+worker. The API container runs `flask db upgrade` on startup via `entrypoint.sh`.
 
-> Note: this was built and validated in an environment without a running Docker daemon, so the compose
-> stack has been checked with `docker compose config` (renders correctly) and the migration has been
-> verified end-to-end against SQLite — but the full multi-container stack itself hasn't been exercised.
-> If anything doesn't come up cleanly on first `docker compose up`, check container logs first.
+The API is mapped to host port **5001** (`ports: "5001:5000"` in `docker-compose.yml`) — port 5000 is
+commonly taken by macOS's AirPlay Receiver. If that's not an issue on your machine, feel free to change it
+back to `5000:5000` (and update the frontend's default `API_BASE_URL` — see below).
 
 ### Run locally (without Docker)
 
@@ -76,6 +82,21 @@ Set `LLM_PROVIDER` to `anthropic`, `openai`, or `gemini` and the matching API ke
 `LLM_PROVIDER=mock`), the app runs a deterministic keyword-based extractor — no live LLM calls, fully
 offline-testable.
 
+### Billing provider
+
+Set `STRIPE_SECRET_KEY` (+ `STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`) to bill
+against real Stripe. With no key set, billing runs in **mock mode**: `POST /api/v1/billing/checkout-session`
+upgrades the account to Premium immediately (no network calls, no Stripe account needed), and
+`POST /api/v1/billing/portal-session` downgrades it back to free. See `app/billing/service.py`.
+
+### Caregiver mode
+
+`app/caregiver` — invite-by-email links from an owner account to a caregiver account, each with three
+independent permission flags (view logs, view trends/reports, edit profile). An invitee doesn't need an
+account yet; the link resolves once they sign up with the invited email and accept. Cross-account reads go
+through one gated endpoint, `GET /api/v1/caregiver/access/<owner_user_id>/summary` — it doesn't yet proxy
+every existing endpoint (today/trends/logbook) for an "acting as caregiver" view; that's a natural follow-up.
+
 ### Adding a new log type
 
 Register it in [`app/logging/types.py`](backend/app/logging/types.py) — a name, a field schema, and
@@ -91,8 +112,13 @@ flutter run
 ```
 
 By default the app points at `http://localhost:5000/api/v1` (iOS simulator/desktop) or
-`http://10.0.2.2:5000/api/v1` (Android emulator, which aliases the host machine). Override with
-`flutter run --dart-define=API_BASE_URL=http://<your-host>:5000/api/v1` for a physical device.
+`http://10.0.2.2:5000/api/v1` (Android emulator, which aliases the host machine) — see
+`lib/core/api/api_config.dart`. If you're running the Docker Compose stack as-is (host port 5001), override
+with:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:5001/api/v1
+```
 
 Run tests/analysis:
 
@@ -102,12 +128,13 @@ flutter test
 cd packages/health_ui && flutter test   # design system package
 ```
 
-> The design system uses `google_fonts`, which fetches font files over the network on first use per
-> device (falling back to a system font if offline). No bundled font assets are included.
+> The design system uses `google_fonts` (Newsreader + DM Sans), which fetches font files over the network on
+> first use per device (falling back to a system font if offline). No bundled font assets are included.
 
 ## Design system (`packages/health_ui`)
 
-Tokens (color/type/spacing), the `KunjanMascot` widget (named states: `idle`, `thinking`, `celebrating`,
-`alerting`, `remembering`), `LogConfirmationCard`, `AlertBanner`, and the `MemoryTrailTimeline` — the app's
-one deliberate structural signature, used on Trends and Logbook. See
-[`Development-Prompt-Health-App.md`](Development-Prompt-Health-App.md) §2–3 for the rationale behind each.
+Tokens (color/type/spacing — "Warm Paper": cream surfaces, charcoal ink, terracotta accent), the `MoMascot`
+widget (named states: `idle`, `thinking`, `celebrating`, `alerting`, `remembering`), `LogConfirmationCard`,
+`AlertBanner`, and the `MemoryTrailTimeline` — the app's one deliberate structural signature, used on Trends
+and Logbook. See [`Development-Prompt-Health-App.md`](Development-Prompt-Health-App.md) §2–3 for the
+rationale behind each, and the design source zip for the full VitaChat prototype these were re-themed to.

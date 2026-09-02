@@ -65,9 +65,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            const KunjanMascot(state: MascotState.idle, size: 32),
+            const MoMascot(state: MascotState.idle, size: 32),
             const SizedBox(width: HealthSpacing.sm),
-            Text('Kunjan', style: HealthTypography.display(fontSize: 20)),
+            Text('Mo', style: HealthTypography.display(fontSize: 20)),
           ],
         ),
       ),
@@ -92,9 +92,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  const KunjanMascot(state: MascotState.thinking, size: 36),
+                  const MoMascot(state: MascotState.thinking, size: 36),
                   const SizedBox(width: HealthSpacing.sm),
-                  Text('Kunjan is thinking…', style: HealthTypography.label()),
+                  Text('Mo is thinking…', style: HealthTypography.label()),
                 ],
               ),
             ),
@@ -114,10 +114,10 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const KunjanMascot(state: MascotState.idle, size: 96),
+            const MoMascot(state: MascotState.idle, size: 96),
             const SizedBox(height: HealthSpacing.md),
             Text(
-              'Nothing logged yet today — tell Kunjan what you had for breakfast.',
+              'Nothing logged yet today — tell Mo what you had for breakfast.',
               style: HealthTypography.mascotSpeech(),
               textAlign: TextAlign.center,
             ),
@@ -203,7 +203,7 @@ class _InputBar extends StatelessWidget {
                 controller: controller,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSend(),
-                decoration: const InputDecoration(hintText: 'Tell Kunjan about your day…'),
+                decoration: const InputDecoration(hintText: 'Tell Mo about your day…'),
               ),
             ),
             const SizedBox(width: HealthSpacing.xs),

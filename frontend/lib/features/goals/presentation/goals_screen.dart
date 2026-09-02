@@ -91,9 +91,9 @@ class GoalsScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const KunjanMascot(state: MascotState.idle, size: 96),
+                    const MoMascot(state: MascotState.idle, size: 96),
                     const SizedBox(height: HealthSpacing.md),
-                    Text('No goals yet — tap + to set one with Kunjan.',
+                    Text('No goals yet — tap + to set one with Mo.',
                         style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
                   ],
                 ),
@@ -138,7 +138,7 @@ class _GoalCardState extends State<_GoalCard> {
     return HealthCard(
       child: Row(
         children: [
-          KunjanMascot(state: _celebrating ? MascotState.celebrating : MascotState.idle, size: 40),
+          MoMascot(state: _celebrating ? MascotState.celebrating : MascotState.idle, size: 40),
           const SizedBox(width: HealthSpacing.sm),
           Expanded(
             child: Column(

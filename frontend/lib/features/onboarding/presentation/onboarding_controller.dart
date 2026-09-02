@@ -27,6 +27,16 @@ class OnboardingController extends StateNotifier<OnboardingDraft> {
     state = state.copyWith(allergies: list);
   }
 
+  void addMedication(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || state.medications.contains(trimmed)) return;
+    state = state.copyWith(medications: [...state.medications, trimmed]);
+  }
+
+  void removeMedication(String name) {
+    state = state.copyWith(medications: state.medications.where((m) => m != name).toList());
+  }
+
   void setAllergySeverity(String name, String severity) {
     final list = state.allergies.map((a) => a.name == name ? AllergyDraft(name: a.name, severity: severity) : a).toList();
     state = state.copyWith(allergies: list);

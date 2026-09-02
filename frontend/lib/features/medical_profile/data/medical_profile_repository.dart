@@ -34,6 +34,26 @@ class MedicalProfileRepository {
   Future<void> deleteAllergy(String id) async {
     await _dio.delete('/allergies/$id');
   }
+
+  Future<void> addLabResult({
+    required String testName,
+    required String value,
+    String? unit,
+    required DateTime takenAt,
+  }) async {
+    await _dio.post('/lab-results', data: {
+      'test_name': testName,
+      'value': value,
+      'unit': ?unit,
+      'taken_at': takenAt.toIso8601String(),
+      'source': 'manual',
+    });
+  }
+
+  Future<List<LabResultData>> fetchLabResults() async {
+    final resp = await _dio.get('/lab-results');
+    return (resp.data as List).map((l) => LabResultData.fromJson(l as Map<String, dynamic>)).toList();
+  }
 }
 
 final medicalProfileRepositoryProvider = Provider<MedicalProfileRepository>((ref) {
@@ -46,4 +66,8 @@ final medicalProfileProvider = FutureProvider.autoDispose<MedicalProfileData>((r
 
 final allergiesProvider = FutureProvider.autoDispose<List<AllergyData>>((ref) {
   return ref.watch(medicalProfileRepositoryProvider).fetchAllergies();
+});
+
+final labResultsProvider = FutureProvider.autoDispose<List<LabResultData>>((ref) {
+  return ref.watch(medicalProfileRepositoryProvider).fetchLabResults();
 });

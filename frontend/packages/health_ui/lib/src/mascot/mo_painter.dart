@@ -5,9 +5,9 @@ import '../tokens/health_colors.dart';
 
 /// A simple, stylized baby-elephant silhouette. Intentionally a placeholder
 /// painter (not final character art) — swap for illustrated/Lottie frames
-/// later without changing KunjanMascot's animation-state contract.
-class KunjanPainter extends CustomPainter {
-  KunjanPainter({
+/// later without changing MoMascot's animation-state contract.
+class MoPainter extends CustomPainter {
+  MoPainter({
     required this.earAngle,
     required this.trunkCurl,
     required this.bodyBounce,
@@ -91,7 +91,7 @@ class KunjanPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant KunjanPainter oldDelegate) {
+  bool shouldRepaint(covariant MoPainter oldDelegate) {
     return oldDelegate.earAngle != earAngle ||
         oldDelegate.trunkCurl != trunkCurl ||
         oldDelegate.bodyBounce != bodyBounce ||

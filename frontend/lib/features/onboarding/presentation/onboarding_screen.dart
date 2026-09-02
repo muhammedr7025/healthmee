@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
+import '../../medical_profile/data/medical_profile_repository.dart';
 import 'onboarding_controller.dart';
 
 const _conditionOptions = [
@@ -36,10 +37,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _submitting = false;
   String? _error;
 
-  static const _stepCount = 4;
+  static const _stepCount = 7;
+  static const _stepLabels = [
+    '1 · Basics',
+    '2 · Allergies',
+    '3 · Medications',
+    '4 · Baseline vitals',
+    '5 · Lab report',
+    '6 · Your goal',
+    '7 · Privacy',
+  ];
   static const _prompts = [
-    "Let's get your basics down — any conditions Kunjan should know about?",
-    "Any allergies I should watch for in your food logs?",
+    "Let's get your basics down — any conditions Mo should know about?",
+    "Any allergies I should watch for in your food logs? Add your own too.",
+    "Anything you're currently taking? Add as many as you like.",
+    "A couple of baseline numbers help Mo spot trends later — all optional.",
+    "Got a recent lab report? Add one value now, or skip and do it later.",
     "What are you working toward? Pick as many as you like.",
     'Last thing — a quick word on privacy, then you\'re all set.',
   ];
@@ -74,11 +87,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(HealthSpacing.lg, HealthSpacing.lg, HealthSpacing.lg, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const KunjanMascot(state: MascotState.idle, size: 56),
-                  const SizedBox(width: HealthSpacing.sm),
-                  Expanded(child: Text(_prompts[_step], style: HealthTypography.mascotSpeech())),
+                  Text(_stepLabels[_step], style: HealthTypography.label()),
+                  const SizedBox(height: HealthSpacing.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const MoMascot(state: MascotState.idle, size: 48),
+                      const SizedBox(width: HealthSpacing.sm),
+                      Expanded(child: Text(_prompts[_step], style: HealthTypography.mascotSpeech())),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -89,8 +110,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _ConditionsStep(draft: draft, controller: controller),
+                  _BasicsStep(draft: draft, controller: controller),
                   _AllergiesStep(draft: draft, controller: controller),
+                  _MedicationsStep(draft: draft, controller: controller),
+                  _VitalsStep(draft: draft, controller: controller),
+                  const _LabScanStep(),
                   _GoalsStep(draft: draft, controller: controller),
                   _ConsentStep(draft: draft, controller: controller, error: _error),
                 ],
@@ -115,7 +139,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           },
                     child: Text(_submitting
                         ? 'Saving…'
-                        : (_step < _stepCount - 1 ? 'Next' : "I'm ready")),
+                        : (_step < _stepCount - 1 ? 'Continue' : "I'm ready")),
                   ),
                 ],
               ),
@@ -127,8 +151,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 }
 
-class _ConditionsStep extends StatelessWidget {
-  const _ConditionsStep({required this.draft, required this.controller});
+class _BasicsStep extends StatelessWidget {
+  const _BasicsStep({required this.draft, required this.controller});
   final dynamic draft;
   final OnboardingController controller;
 
@@ -136,24 +160,270 @@ class _ConditionsStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(HealthSpacing.lg),
-      child: Wrap(
-        spacing: HealthSpacing.sm,
-        runSpacing: HealthSpacing.sm,
-        children: _conditionOptions.map((c) {
-          final selected = draft.conditions.contains(c);
-          return FilterChip(
-            label: Text(c),
-            selected: selected,
-            onSelected: (_) => controller.toggleCondition(c),
-          );
-        }).toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _VitalField(
+                  label: 'Age',
+                  vitalKey: 'age',
+                  draft: draft,
+                  controller: controller,
+                  hint: '34',
+                ),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              Expanded(
+                child: _VitalField(
+                  label: 'Height (cm)',
+                  vitalKey: 'height_cm',
+                  draft: draft,
+                  controller: controller,
+                  hint: '172',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _VitalField(
+                  label: 'Weight (kg)',
+                  vitalKey: 'weight_kg',
+                  draft: draft,
+                  controller: controller,
+                  hint: '78',
+                ),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              Expanded(
+                child: _VitalField(
+                  label: 'Waking hours',
+                  vitalKey: 'waking_hours',
+                  draft: draft,
+                  controller: controller,
+                  hint: '7am – 11pm',
+                  keyboardType: TextInputType.text,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.lg),
+          Text('Conditions you\'re managing', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          Wrap(
+            spacing: HealthSpacing.sm,
+            runSpacing: HealthSpacing.sm,
+            children: _conditionOptions.map((c) {
+              final selected = draft.conditions.contains(c);
+              return FilterChip(
+                label: Text(c),
+                selected: selected,
+                onSelected: (_) => controller.toggleCondition(c),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _AllergiesStep extends StatelessWidget {
+class _VitalField extends StatelessWidget {
+  const _VitalField({
+    required this.label,
+    required this.vitalKey,
+    required this.draft,
+    required this.controller,
+    this.hint,
+    this.keyboardType = TextInputType.number,
+  });
+
+  final String label;
+  final String vitalKey;
+  final dynamic draft;
+  final OnboardingController controller;
+  final String? hint;
+  final TextInputType keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = draft.baselineVitals[vitalKey]?.toString() ?? '';
+    return TextFormField(
+      key: ValueKey('$vitalKey-${draft.baselineVitals[vitalKey]}'),
+      initialValue: value,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(labelText: label, hintText: hint),
+      onChanged: (v) {
+        if (keyboardType == TextInputType.number) {
+          controller.updateVital(vitalKey, int.tryParse(v) ?? v);
+        } else {
+          controller.updateVital(vitalKey, v);
+        }
+      },
+    );
+  }
+}
+
+class _AllergiesStep extends StatefulWidget {
   const _AllergiesStep({required this.draft, required this.controller});
+  final dynamic draft;
+  final OnboardingController controller;
+
+  @override
+  State<_AllergiesStep> createState() => _AllergiesStepState();
+}
+
+class _AllergiesStepState extends State<_AllergiesStep> {
+  final _customController = TextEditingController();
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  void _addCustom() {
+    final text = _customController.text.trim();
+    if (text.isEmpty) return;
+    widget.controller.toggleAllergy(text);
+    _customController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customAllergies = widget.draft.allergies
+        .map((a) => a.name as String)
+        .where((n) => !_allergyOptions.contains(n))
+        .toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(HealthSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: HealthSpacing.sm,
+            runSpacing: HealthSpacing.sm,
+            children: [
+              ..._allergyOptions.map((a) {
+                final selected = widget.draft.allergies.any((d) => d.name == a);
+                return FilterChip(
+                  label: Text(a),
+                  selected: selected,
+                  selectedColor: HealthColors.alertTrigger.withValues(alpha: 0.15),
+                  onSelected: (_) => widget.controller.toggleAllergy(a),
+                );
+              }),
+              ...customAllergies.map((a) => FilterChip(
+                    label: Text(a),
+                    selected: true,
+                    selectedColor: HealthColors.alertTrigger.withValues(alpha: 0.15),
+                    onSelected: (_) => widget.controller.toggleAllergy(a),
+                  )),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.lg),
+          Text('Something else? Add it yourself', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _customController,
+                  decoration: const InputDecoration(hintText: 'e.g. Brinjal, sulphites, ajinomoto'),
+                  onSubmitted: (_) => _addCustom(),
+                ),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              IconButton.filled(onPressed: _addCustom, icon: const Icon(Icons.add)),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.sm),
+          Text(
+            'Anything you add here gets the same hard warning as the ones above.',
+            style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MedicationsStep extends StatefulWidget {
+  const _MedicationsStep({required this.draft, required this.controller});
+  final dynamic draft;
+  final OnboardingController controller;
+
+  @override
+  State<_MedicationsStep> createState() => _MedicationsStepState();
+}
+
+class _MedicationsStepState extends State<_MedicationsStep> {
+  final _medController = TextEditingController();
+
+  @override
+  void dispose() {
+    _medController.dispose();
+    super.dispose();
+  }
+
+  void _add() {
+    final text = _medController.text.trim();
+    if (text.isEmpty) return;
+    widget.controller.addMedication(text);
+    _medController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(HealthSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _medController,
+                  decoration: const InputDecoration(hintText: 'e.g. Metformin 500mg, twice daily'),
+                  onSubmitted: (_) => _add(),
+                ),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              IconButton.filled(onPressed: _add, icon: const Icon(Icons.add)),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.md),
+          if (widget.draft.medications.isEmpty)
+            Text('None yet — skip if you\'re not on anything.', style: HealthTypography.body(color: HealthColors.inkMuted))
+          else
+            ...widget.draft.medications.map<Widget>((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
+                  child: HealthCard(
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(m as String, style: HealthTypography.body())),
+                        IconButton(
+                          onPressed: () => widget.controller.removeMedication(m),
+                          icon: const Icon(Icons.close, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+}
+
+class _VitalsStep extends StatelessWidget {
+  const _VitalsStep({required this.draft, required this.controller});
   final dynamic draft;
   final OnboardingController controller;
 
@@ -161,18 +431,127 @@ class _AllergiesStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(HealthSpacing.lg),
-      child: Wrap(
-        spacing: HealthSpacing.sm,
-        runSpacing: HealthSpacing.sm,
-        children: _allergyOptions.map((a) {
-          final selected = draft.allergies.any((d) => d.name == a);
-          return FilterChip(
-            label: Text(a),
-            selected: selected,
-            selectedColor: HealthColors.alertTrigger.withValues(alpha: 0.15),
-            onSelected: (_) => controller.toggleAllergy(a),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Blood pressure', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _VitalField(
+                  label: 'Systolic',
+                  vitalKey: 'bp_systolic',
+                  draft: draft,
+                  controller: controller,
+                  hint: '120',
+                ),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              Expanded(
+                child: _VitalField(
+                  label: 'Diastolic',
+                  vitalKey: 'bp_diastolic',
+                  draft: draft,
+                  controller: controller,
+                  hint: '80',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.lg),
+          Text('Blood glucose', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          _VitalField(
+            label: 'Fasting glucose (mg/dL)',
+            vitalKey: 'glucose_mg_dl',
+            draft: draft,
+            controller: controller,
+            hint: '95',
+          ),
+          const SizedBox(height: HealthSpacing.sm),
+          Text(
+            'All optional — add what you know today, update the rest later from your Medical Profile.',
+            style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LabScanStep extends ConsumerStatefulWidget {
+  const _LabScanStep();
+
+  @override
+  ConsumerState<_LabScanStep> createState() => _LabScanStepState();
+}
+
+class _LabScanStepState extends ConsumerState<_LabScanStep> {
+  final _testController = TextEditingController();
+  final _valueController = TextEditingController();
+  final _unitController = TextEditingController();
+  bool _saving = false;
+  bool _saved = false;
+
+  @override
+  void dispose() {
+    _testController.dispose();
+    _valueController.dispose();
+    _unitController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_testController.text.trim().isEmpty || _valueController.text.trim().isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(medicalProfileRepositoryProvider).addLabResult(
+            testName: _testController.text.trim(),
+            value: _valueController.text.trim(),
+            unit: _unitController.text.trim().isEmpty ? null : _unitController.text.trim(),
+            takenAt: DateTime.now(),
           );
-        }).toList(),
+      if (mounted) setState(() => _saved = true);
+    } catch (_) {
+      // Non-blocking — onboarding continues either way.
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(HealthSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Photo scanning of lab reports is coming in a later update — for now you can type in one '
+            'value by hand, or skip this entirely and add it from your Medical Profile whenever you like.',
+            style: HealthTypography.body(color: HealthColors.inkMuted),
+          ),
+          const SizedBox(height: HealthSpacing.lg),
+          TextField(controller: _testController, decoration: const InputDecoration(labelText: 'Test name (e.g. HbA1c)')),
+          const SizedBox(height: HealthSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(controller: _valueController, decoration: const InputDecoration(labelText: 'Value')),
+              ),
+              const SizedBox(width: HealthSpacing.sm),
+              Expanded(
+                child: TextField(controller: _unitController, decoration: const InputDecoration(labelText: 'Unit (optional)')),
+              ),
+            ],
+          ),
+          const SizedBox(height: HealthSpacing.md),
+          if (_saved)
+            Text('Saved to your medical profile.', style: HealthTypography.body(color: HealthColors.accentSecondary))
+          else
+            OutlinedButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving…' : 'Add this value')),
+        ],
       ),
     );
   }

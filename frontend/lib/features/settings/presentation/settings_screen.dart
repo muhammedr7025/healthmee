@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
 import '../../auth/presentation/auth_controller.dart';
+import '../../billing/presentation/paywall_screen.dart';
+import '../../caregiver/presentation/caregiver_screen.dart';
 import '../../goals/presentation/goals_screen.dart';
 import '../../medical_profile/presentation/medical_profile_screen.dart';
+import '../../reports/presentation/reports_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -18,7 +21,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         children: [
           ListTile(
-            leading: const KunjanMascot(state: MascotState.idle, size: 40),
+            leading: const MoMascot(state: MascotState.idle, size: 40),
             title: Text(user?.fullName?.isNotEmpty == true ? user!.fullName! : (user?.email ?? '')),
             subtitle: Text(user?.email ?? ''),
           ),
@@ -38,9 +41,20 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.picture_as_pdf_outlined),
             title: const Text('Reports'),
-            subtitle: const Text('Coming in a future update'),
-            onTap: () => ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('PDF report export is planned for Phase 2.'))),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.people_outline),
+            title: const Text('Caregiver mode'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CaregiverScreen())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.workspace_premium_outlined),
+            title: const Text('Upgrade to Premium'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen())),
           ),
           const Divider(),
           ListTile(

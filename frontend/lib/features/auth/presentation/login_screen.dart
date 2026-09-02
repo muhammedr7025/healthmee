@@ -60,13 +60,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const KunjanMascot(state: MascotState.idle, size: 120),
+                const MoMascot(state: MascotState.idle, size: 120),
                 const SizedBox(height: HealthSpacing.md),
-                Text('Health', style: HealthTypography.display(fontSize: 32)),
+                Text(
+                  _isRegister ? "Hi, I'm Mo." : 'Welcome back.',
+                  style: HealthTypography.display(fontSize: 32),
+                ),
                 const SizedBox(height: HealthSpacing.xs),
                 Text(
-                  _isRegister ? "Let's get you started." : 'Kunjan remembers where you left off.',
-                  style: HealthTypography.mascotSpeech(),
+                  _isRegister
+                      ? 'Tell me what you ate, how you slept, how you feel. Type it, snap it, or say it. '
+                          "I'll do the filing."
+                      : 'Mo remembers where you left off.',
+                  style: HealthTypography.body(fontSize: 15, color: HealthColors.inkMuted),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: HealthSpacing.xl),

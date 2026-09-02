@@ -1,8 +1,12 @@
+from datetime import datetime, timedelta, timezone
+
+from flask import current_app
 from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
 
 from app.accounts.models import User
+from app.billing.service import is_premium
 from app.logging.extraction.pipeline import process_message
 from app.logging.models import LogEntry
 from app.logging.schemas import ChatMessageSchema, ChatResponseSchema, LogbookQuerySchema, LogEntrySchema
@@ -26,11 +30,24 @@ class Logbook(MethodView):
     @blp.arguments(LogbookQuerySchema, location="query")
     @blp.response(200, LogEntrySchema(many=True))
     def get(self, args):
-        query = LogEntry.query.filter_by(user_id=get_jwt_identity())
+        user_id = get_jwt_identity()
+        query = LogEntry.query.filter_by(user_id=user_id)
         if args.get("type"):
             query = query.filter(LogEntry.type == args["type"])
-        if args.get("start"):
-            query = query.filter(LogEntry.timestamp >= args["start"])
+
+        start = args.get("start")
+        if start and start.tzinfo:
+            start = start.replace(tzinfo=None)
+        if not is_premium(user_id):
+            # Free tier: history capped at FREE_TIER_LOGBOOK_DAYS (paywall
+            # "Unlimited history instead of 30 days"). Clamp rather than
+            # reject, so a wider request just silently gets the free window.
+            free_tier_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+                days=current_app.config["FREE_TIER_LOGBOOK_DAYS"]
+            )
+            start = max(start, free_tier_cutoff) if start else free_tier_cutoff
+        if start:
+            query = query.filter(LogEntry.timestamp >= start)
         if args.get("end"):
             query = query.filter(LogEntry.timestamp <= args["end"])
 

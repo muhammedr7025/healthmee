@@ -34,6 +34,8 @@ def create_app(config_class=Config):
 def _import_models():
     from app.accounts import models as _accounts_models  # noqa: F401
     from app.analytics import models as _analytics_models  # noqa: F401
+    from app.billing import models as _billing_models  # noqa: F401
+    from app.caregiver import models as _caregiver_models  # noqa: F401
     from app.goals import models as _goals_models  # noqa: F401
     from app.logging import models as _logging_models  # noqa: F401
     from app.media import models as _media_models  # noqa: F401
@@ -44,6 +46,8 @@ def _import_models():
 def _register_blueprints(api: Api):
     from app.accounts.routes import blp as accounts_blp
     from app.analytics.routes import blp as analytics_blp
+    from app.billing.routes import blp as billing_blp
+    from app.caregiver.routes import blp as caregiver_blp
     from app.goals.routes import blp as goals_blp
     from app.logging.routes import blp as logging_blp
     from app.media.routes import blp as media_blp
@@ -60,5 +64,7 @@ def _register_blueprints(api: Api):
         media_blp,
         notifications_blp,
         reports_blp,
+        caregiver_blp,
+        billing_blp,
     ):
         api.register_blueprint(blp)
