@@ -27,6 +27,16 @@ class _AppShellState extends State<AppShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         backgroundColor: HealthColors.bgBase,
+        elevation: 0,
+        indicatorColor: HealthColors.chipIdle,
+        surfaceTintColor: Colors.transparent,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => HealthTypography.body(
+            fontSize: 11.5,
+            weight: FontWeight.w500,
+            color: states.contains(WidgetState.selected) ? HealthColors.inkPrimary : HealthColors.inkMuted,
+          ),
+        ),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
           NavigationDestination(icon: Icon(Icons.today_outlined), selectedIcon: Icon(Icons.today), label: 'Today'),

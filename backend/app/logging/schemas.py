@@ -10,10 +10,16 @@ class LogEntrySchema(Schema):
     id = fields.String(dump_only=True)
     type = fields.String(dump_only=True)
     timestamp = fields.String(dump_only=True)
-    payload = fields.Dict(dump_only=True)
+    payload = fields.Dict(dump_only=True, attribute="structured_payload")
     raw_text = fields.String(dump_only=True, allow_none=True)
     summary = fields.String(dump_only=True, allow_none=True)
     media_asset_id = fields.String(dump_only=True, allow_none=True)
+
+
+class LogEntryUpdateSchema(Schema):
+    summary = fields.String(required=False, allow_none=True)
+    raw_text = fields.String(required=False, allow_none=True)
+    structured_payload = fields.Dict(required=False, attribute="structured_payload", data_key="payload")
 
 
 class ChatResponseSchema(Schema):

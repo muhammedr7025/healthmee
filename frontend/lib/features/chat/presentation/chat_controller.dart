@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/chat_repository.dart';
 import '../domain/chat_thread_item.dart';
+import '../domain/log_row_formatter.dart';
 
 class ChatState {
   const ChatState({this.items = const [], this.isThinking = false});
@@ -27,7 +28,12 @@ class ChatController extends StateNotifier<ChatState> {
       final result = await _repo.sendMessage(text);
       final newItems = <ChatThreadItem>[
         for (final entry in result.entries)
-          ChatThreadItem.logCard(logType: entry['type'] as String, summary: entry['summary'] as String? ?? ''),
+          ChatThreadItem.extractCard(
+            entryId: entry['id'] as String,
+            logType: entry['type'] as String,
+            summary: extractCardLabel(entry['type'] as String),
+            rows: formatLogRows(entry['type'] as String, Map<String, dynamic>.from(entry['payload'] as Map? ?? {})),
+          ),
         for (final alert in result.alerts)
           ChatThreadItem.alert(message: alert['message'] as String, hard: alert['severity'] == 'hard'),
         if (result.reply.isNotEmpty) ChatThreadItem.assistantReply(result.reply),
@@ -39,6 +45,33 @@ class ChatController extends StateNotifier<ChatState> {
         isThinking: false,
       );
     }
+  }
+
+  void confirmEntry(String entryId) {
+    state = state.copyWith(
+      items: [
+        for (final item in state.items)
+          if (item.entryId == entryId) item.copyWith(confirmed: true) else item,
+      ],
+    );
+  }
+
+  Future<void> editEntry(String entryId, String newSummaryLine) async {
+    await _repo.editEntrySummary(entryId, newSummaryLine);
+    state = state.copyWith(
+      items: [
+        for (final item in state.items)
+          if (item.entryId == entryId)
+            ChatThreadItem.extractCard(
+              entryId: entryId,
+              logType: item.logType ?? '',
+              summary: item.summary ?? '',
+              rows: [MapEntry(newSummaryLine, '')],
+            ).copyWith(confirmed: true)
+          else
+            item,
+      ],
+    );
   }
 }
 

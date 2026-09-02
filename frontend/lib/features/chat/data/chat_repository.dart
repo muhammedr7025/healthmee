@@ -26,6 +26,14 @@ class ChatRepository {
     final resp = await _dio.post('/chat/messages', data: {'text': text});
     return ChatExtractionResult.fromJson(resp.data as Map<String, dynamic>);
   }
+
+  Future<void> editEntrySummary(String entryId, String summary) async {
+    await _dio.patch('/log-entries/$entryId', data: {'summary': summary});
+  }
+
+  Future<void> deleteEntry(String entryId) async {
+    await _dio.delete('/log-entries/$entryId');
+  }
 }
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) => ChatRepository(ref.watch(dioProvider)));

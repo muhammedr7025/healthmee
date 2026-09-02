@@ -7,9 +7,16 @@ from flask_smorest import Blueprint
 
 from app.accounts.models import User
 from app.billing.service import is_premium
+from app.extensions import db
 from app.logging.extraction.pipeline import process_message
 from app.logging.models import LogEntry
-from app.logging.schemas import ChatMessageSchema, ChatResponseSchema, LogbookQuerySchema, LogEntrySchema
+from app.logging.schemas import (
+    ChatMessageSchema,
+    ChatResponseSchema,
+    LogbookQuerySchema,
+    LogEntrySchema,
+    LogEntryUpdateSchema,
+)
 
 blp = Blueprint("logging", __name__, url_prefix="/api/v1", description="Chat logging & logbook")
 
@@ -54,3 +61,38 @@ class Logbook(MethodView):
         query = query.order_by(LogEntry.timestamp.desc())
         page = query.paginate(page=args["page"], per_page=args["per_page"], error_out=False)
         return page.items
+
+
+@blp.route("/log-entries/<string:entry_id>")
+class LogEntryDetail(MethodView):
+    """Backs the chat confirmation card's "Edit" action (dev-prompt: entries
+    are saved immediately on extraction, so "editing" corrects the saved row
+    rather than confirming a pending one)."""
+
+    @jwt_required()
+    @blp.arguments(LogEntryUpdateSchema)
+    @blp.response(200, LogEntrySchema)
+    def patch(self, data, entry_id):
+        user_id = get_jwt_identity()
+        entry = LogEntry.query.filter_by(id=entry_id, user_id=user_id).first_or_404()
+        for key, value in data.items():
+            setattr(entry, key, value)
+        db.session.commit()
+        _recompute(user_id, entry.timestamp.date())
+        return entry
+
+    @jwt_required()
+    @blp.response(204)
+    def delete(self, entry_id):
+        user_id = get_jwt_identity()
+        entry = LogEntry.query.filter_by(id=entry_id, user_id=user_id).first_or_404()
+        entry_date = entry.timestamp.date()
+        db.session.delete(entry)
+        db.session.commit()
+        _recompute(user_id, entry_date)
+
+
+def _recompute(user_id: str, day) -> None:
+    from app.analytics.tasks import recompute_daily_aggregate
+
+    recompute_daily_aggregate.delay(user_id, day.isoformat())
