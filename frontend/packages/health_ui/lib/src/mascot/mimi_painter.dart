@@ -5,9 +5,9 @@ import '../tokens/health_colors.dart';
 
 /// A simple, stylized baby-elephant silhouette. Intentionally a placeholder
 /// painter (not final character art) — swap for illustrated/Lottie frames
-/// later without changing MoMascot's animation-state contract.
-class MoPainter extends CustomPainter {
-  MoPainter({
+/// later without changing MimiMascot's animation-state contract.
+class MimiPainter extends CustomPainter {
+  MimiPainter({
     required this.earAngle,
     required this.trunkCurl,
     required this.bodyBounce,
@@ -91,7 +91,7 @@ class MoPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MoPainter oldDelegate) {
+  bool shouldRepaint(covariant MimiPainter oldDelegate) {
     return oldDelegate.earAngle != earAngle ||
         oldDelegate.trunkCurl != trunkCurl ||
         oldDelegate.bodyBounce != bodyBounce ||

@@ -20,7 +20,7 @@ def default_narrative(stats: dict) -> str:
     log_count = stats.get("log_count", 0)
 
     if days_logged == 0:
-        return "Nothing logged in this period yet — once you tell Mo a few things, a summary will show up here."
+        return "Nothing logged in this period yet — once you tell MiMi a few things, a summary will show up here."
 
     sentences = [f"You logged something on {days_logged} of the last {days_total} days ({log_count} entries total)."]
 

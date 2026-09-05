@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which bottom-nav tab is active — a provider (not local State) so other
-/// screens can switch tabs programmatically, e.g. Trends' "Ask Mo about
+/// screens can switch tabs programmatically, e.g. Trends' "Ask MiMi about
 /// this" jumping to Chat.
 final activeTabProvider = StateProvider<int>((ref) => 0);
 

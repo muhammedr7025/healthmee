@@ -15,7 +15,7 @@ class HealthApp extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
 
     return MaterialApp(
-      title: 'VitaChat',
+      title: 'Health MEE',
       debugShowCheckedModeBanner: false,
       theme: HealthTheme.light(),
       home: switch (auth.status) {
@@ -34,7 +34,7 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: MoMascot(state: MascotState.idle, size: 120)),
+      body: Center(child: MimiMascot(state: MascotState.idle, size: 120)),
     );
   }
 }

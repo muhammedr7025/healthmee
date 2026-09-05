@@ -51,7 +51,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final asyncTrends = ref.watch(trendsDataProvider);
     final streak = asyncTrends.maybeWhen(data: computeStreak, orElse: () => 0);
 
-    // Other tabs (e.g. Trends' "Ask Mo about this") queue a message here.
+    // Other tabs (e.g. Trends' "Ask MiMi about this") queue a message here.
     ref.listen<String?>(pendingChatMessageProvider, (previous, next) {
       if (next != null) {
         ref.read(pendingChatMessageProvider.notifier).state = null;
@@ -121,14 +121,14 @@ class _ChatHeader extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: const BoxDecoration(color: HealthColors.chipIdle, shape: BoxShape.circle),
-            child: MoMascot(state: thinking ? MascotState.thinking : MascotState.idle, size: 40),
+            child: MimiMascot(state: thinking ? MascotState.thinking : MascotState.idle, size: 40),
           ),
           const SizedBox(width: HealthSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Mo', style: HealthTypography.display(fontSize: 21)),
+                Text('MiMi', style: HealthTypography.display(fontSize: 21)),
                 Text(thinking ? 'thinking…' : 'here whenever you are', style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkMuted)),
               ],
             ),
@@ -170,10 +170,10 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const MoMascot(state: MascotState.idle, size: 96),
+            const MimiMascot(state: MascotState.idle, size: 96),
             const SizedBox(height: HealthSpacing.md),
             Text(
-              'Nothing logged yet today — tell Mo what you had for breakfast.',
+              'Nothing logged yet today — tell MiMi what you had for breakfast.',
               style: HealthTypography.mascotSpeech(),
               textAlign: TextAlign.center,
             ),
@@ -206,7 +206,7 @@ class _TypingBubbleState extends State<_TypingBubble> with SingleTickerProviderS
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        const SizedBox(width: 32, child: Center(child: MoMascot(state: MascotState.thinking, size: 30))),
+        const SizedBox(width: 32, child: Center(child: MimiMascot(state: MascotState.thinking, size: 30))),
         const SizedBox(width: HealthSpacing.sm),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
@@ -309,7 +309,7 @@ class _ThreadItemView extends ConsumerWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(width: 32, child: Center(child: MoMascot(state: MascotState.idle, size: 30))),
+            const SizedBox(width: 32, child: Center(child: MimiMascot(state: MascotState.idle, size: 30))),
             const SizedBox(width: HealthSpacing.sm),
             Flexible(
               child: Container(
@@ -335,7 +335,7 @@ class _ThreadItemView extends ConsumerWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(width: 32, child: Center(child: MoMascot(state: MascotState.alerting, size: 30))),
+            const SizedBox(width: 32, child: Center(child: MimiMascot(state: MascotState.alerting, size: 30))),
             const SizedBox(width: HealthSpacing.sm),
             Expanded(
               child: Container(
@@ -585,7 +585,7 @@ class _QuickRepliesAndInput extends ConsumerWidget {
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => onSend(),
                     decoration: const InputDecoration(
-                      hintText: 'Tell Mo anything…',
+                      hintText: 'Tell MiMi anything…',
                       border: InputBorder.none,
                       isCollapsed: true,
                       filled: false,

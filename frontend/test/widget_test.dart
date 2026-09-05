@@ -23,7 +23,7 @@ void main() {
         child: const HealthApp(),
       ),
     );
-    // Not pumpAndSettle: MoMascot's idle/thinking states loop
+    // Not pumpAndSettle: MimiMascot's idle/thinking states loop
     // indefinitely by design, so it never "settles".
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 200));

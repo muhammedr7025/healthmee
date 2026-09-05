@@ -51,11 +51,11 @@ def build_report_pdf(
     story = []
 
     # Cover
-    story.append(Paragraph("VitaChat health summary", title_style))
+    story.append(Paragraph("Health MEE health summary", title_style))
     story.append(Paragraph(f"{user_name or user_email}", body))
     story.append(Paragraph(f"{start.isoformat()} to {end.isoformat()}", muted))
     story.append(Paragraph(
-        "This is a summary of self-reported data from the VitaChat journal. It is not a diagnosis "
+        "This is a summary of self-reported data from the Health MEE journal. It is not a diagnosis "
         "and does not replace clinical judgment.",
         muted,
     ))

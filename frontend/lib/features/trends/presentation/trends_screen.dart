@@ -53,7 +53,7 @@ class TrendsScreen extends ConsumerWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const MoMascot(state: MascotState.idle, size: 96),
+                      const MimiMascot(state: MascotState.idle, size: 96),
                       const SizedBox(height: HealthSpacing.md),
                       Text('Log a few days and trends will start showing up here.',
                           style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
@@ -245,7 +245,7 @@ class _TrendsBody extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const MoMascot(state: MascotState.remembering, size: 38),
+                const MimiMascot(state: MascotState.remembering, size: 38),
                 const SizedBox(width: 12),
                 Expanded(child: Text(trends.callouts.first, style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText))),
               ],
@@ -338,7 +338,7 @@ class _ReadView extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          const MoMascot(state: MascotState.remembering, size: 42),
+                          const MimiMascot(state: MascotState.remembering, size: 42),
                           const SizedBox(width: 11),
                           Expanded(
                             child: Column(
@@ -407,7 +407,7 @@ class _ReadView extends ConsumerWidget {
                               'Explain my ${period == 'today' ? "today's" : "$period's"} summary';
                           ref.read(activeTabProvider.notifier).state = chatTabIndex;
                         },
-                        child: const Text('Ask Mo about this'),
+                        child: const Text('Ask MiMi about this'),
                       ),
                     ),
                     const SizedBox(width: 9),
@@ -419,7 +419,7 @@ class _ReadView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Mo reads patterns in your own logs. It is not a diagnosis, and it doesn\'t replace your doctor.',
+                  'MiMi reads patterns in your own logs. It is not a diagnosis, and it doesn\'t replace your doctor.',
                   style: HealthTypography.body(fontSize: 11, color: HealthColors.inkFaint),
                   textAlign: TextAlign.center,
                 ),

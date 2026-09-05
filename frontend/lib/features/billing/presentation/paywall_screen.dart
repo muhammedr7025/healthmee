@@ -9,7 +9,7 @@ const _premiumFeatures = [
   'Photo and video logging — plates, lab reports, workouts',
   'Unlimited history instead of 30 days',
   'Doctor-ready PDF reports and share links',
-  'Correlations and weekly check-ins from Mo',
+  'Correlations and weekly check-ins from MiMi',
 ];
 
 class PaywallScreen extends ConsumerStatefulWidget {
@@ -85,17 +85,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   child: Text('Not now', style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted)),
                 ),
               ),
-              Center(child: MoMascot(state: sub.isPremium ? MascotState.celebrating : MascotState.idle, size: 96)),
+              Center(child: MimiMascot(state: sub.isPremium ? MascotState.celebrating : MascotState.idle, size: 96)),
               const SizedBox(height: 14),
               Text(
-                sub.isPremium ? "You're on Premium" : 'Let Mo see everything',
+                sub.isPremium ? "You're on Premium" : 'Let MiMi see everything',
                 style: HealthTypography.display(fontSize: 27),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 sub.isPremium
-                    ? 'Thanks for supporting VitaChat — everything below is unlocked.'
+                    ? 'Thanks for supporting Health MEE — everything below is unlocked.'
                     : 'Photos, video, full history and the doctor report.',
                 style: HealthTypography.body(fontSize: 13.5, color: HealthColors.inkMuted),
                 textAlign: TextAlign.center,

@@ -60,10 +60,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const MoMascot(state: MascotState.idle, size: 120),
+                const MimiMascot(state: MascotState.idle, size: 120),
                 const SizedBox(height: HealthSpacing.md),
                 Text(
-                  _isRegister ? "Hi, I'm Mo." : 'Welcome back.',
+                  _isRegister ? "Hi, I'm MiMi." : 'Welcome back.',
                   style: HealthTypography.display(fontSize: 32),
                 ),
                 const SizedBox(height: HealthSpacing.xs),
@@ -71,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   _isRegister
                       ? 'Tell me what you ate, how you slept, how you feel. Type it, snap it, or say it. '
                           "I'll do the filing."
-                      : 'Mo remembers where you left off.',
+                      : 'MiMi remembers where you left off.',
                   style: HealthTypography.body(fontSize: 15, color: HealthColors.inkMuted),
                   textAlign: TextAlign.center,
                 ),

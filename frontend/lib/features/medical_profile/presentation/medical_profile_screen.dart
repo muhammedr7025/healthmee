@@ -389,7 +389,7 @@ class _TrackingTab extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const MoMascot(state: MascotState.idle, size: 96),
+                  const MimiMascot(state: MascotState.idle, size: 96),
                   const SizedBox(height: HealthSpacing.md),
                   Text('Add a lab value on the Profile tab and it\'ll show up here over time.',
                       style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),

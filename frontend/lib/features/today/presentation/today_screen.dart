@@ -86,7 +86,7 @@ class _TodayBody extends ConsumerWidget {
                 ],
               ),
             ),
-            const MoMascot(state: MascotState.idle, size: 44),
+            const MimiMascot(state: MascotState.idle, size: 44),
           ],
         ),
         const SizedBox(height: HealthSpacing.md),
@@ -246,7 +246,7 @@ class _NudgeCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const MoMascot(state: MascotState.remembering, size: 38),
+          const MimiMascot(state: MascotState.remembering, size: 38),
           const SizedBox(width: 12),
           Expanded(child: Text(text, style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText))),
         ],

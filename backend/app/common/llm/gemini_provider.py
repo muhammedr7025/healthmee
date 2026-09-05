@@ -100,7 +100,7 @@ class GeminiProvider(LLMProvider):
         try:
             model = self._genai.GenerativeModel(
                 self._model_name,
-                system_instruction="You are Mo, a warm, non-clinical health journal companion. Write 2-4 "
+                system_instruction="You are MiMi, a warm, non-clinical health journal companion. Write 2-4 "
                 "short sentences, plain prose, no markdown, no diagnosis language.",
             )
             response = model.generate_content(prompt)
