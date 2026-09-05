@@ -19,9 +19,11 @@ def send(to_email: str, subject: str, body: str) -> None:
         return
 
     # No SMTP configured — nothing left to fail on, so the caller (e.g. a
-    # password-reset request) can proceed as if delivery succeeded. Logged
-    # rather than silently dropped so the code is still retrievable in dev.
-    current_app.logger.info("email (mock, not delivered) to=%s subject=%r\n%s", to_email, subject, body)
+    # password-reset request) can proceed as if delivery succeeded. Logged at
+    # WARNING rather than INFO: Flask's default (non-debug) logger drops
+    # INFO, which would make this silently unrecoverable instead of just
+    # undelivered.
+    current_app.logger.warning("email (mock, not delivered) to=%s subject=%r\n%s", to_email, subject, body)
 
 
 def _send_smtp(to_email: str, subject: str, body: str) -> None:
