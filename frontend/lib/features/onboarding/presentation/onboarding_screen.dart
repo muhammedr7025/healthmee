@@ -38,29 +38,89 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _submitting = false;
   String? _error;
 
-  static const _stepCount = 7;
+  static const _stepCount = 8;
+  static const _consentStep = 6;
   static const _stepLabels = [
-    '1 · Basics',
+    '1 · About you',
     '2 · Allergies',
     '3 · Medications',
     '4 · Baseline vitals',
     '5 · Lab report',
     '6 · Your goal',
     '7 · Privacy',
+    'All set',
   ];
   static const _prompts = [
-    "Let's get your basics down — any conditions Mo should know about?",
-    "Any allergies I should watch for in your food logs? Add your own too.",
-    "Anything you're currently taking? Add as many as you like.",
-    "A couple of baseline numbers help Mo spot trends later — all optional.",
-    "Got a recent lab report? Add one value now, or skip and do it later.",
-    "What are you working toward? Pick as many as you like.",
-    'Last thing — a quick word on privacy, then you\'re all set.',
+    "Let's start with you. Anything you're managing day to day?",
+    "What should I never let slip past? I'll check every meal against this.",
+    "Anything you're taking right now? Add as many as you like.",
+    "A couple of numbers now means I can show you movement later. All optional.",
+    "Got a recent lab report? Snap it and I'll read what I can — or skip it.",
+    "What are we working toward? Pick as many as fit.",
+    "Last thing — how your data is handled. Then we're done.",
+    "That's everything. Here's what I've got for you.",
   ];
 
   void _goTo(int step) {
+    FocusScope.of(context).unfocus();
     setState(() => _step = step);
     _pageController.animateToPage(step, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
+
+  /// Mo's follow-up bubble — reacts to what's actually been entered so far,
+  /// so the flow answers back instead of just marching through forms. Every
+  /// line is derived from real draft data; nothing is said that isn't true.
+  String? _reactionFor(int step, dynamic draft) {
+    switch (step) {
+      case 0:
+        final conditions = List<String>.from(draft.conditions);
+        if (conditions.isNotEmpty) {
+          return "${_joinNicely(conditions)} — noted. I'll keep that in mind every time you log.";
+        }
+        final vitals = Map<String, dynamic>.from(draft.baselineVitals);
+        if (vitals['age'] != null || vitals['weight_kg'] != null || vitals['height_cm'] != null) {
+          return "Got it — that gives me a starting point.";
+        }
+        return null;
+      case 1:
+        final names = draft.allergies.map((a) => a.name as String).toList().cast<String>();
+        if (names.isEmpty) return null;
+        return "${_joinNicely(names)} — I'll flag ${names.length == 1 ? 'it' : 'these'} hard, every single time.";
+      case 2:
+        final meds = List<String>.from(draft.medications);
+        if (meds.isEmpty) return null;
+        return "${meds.length} tracked. I'll remember ${meds.length == 1 ? 'it' : 'them'}.";
+      case 3:
+        final v = Map<String, dynamic>.from(draft.baselineVitals);
+        final parts = <String>[];
+        if (v['bp_systolic'] != null && v['bp_diastolic'] != null) {
+          parts.add('${v['bp_systolic']}/${v['bp_diastolic']}');
+        }
+        if (v['glucose_mg_dl'] != null) parts.add('${v['glucose_mg_dl']} mg/dL');
+        if (parts.isEmpty) return null;
+        return "${parts.join(' · ')} — that's your starting line. We'll measure from here.";
+      case 5:
+        final goals = draft.goals;
+        if (goals.isEmpty) return null;
+        return "${goals.length} goal${goals.length == 1 ? '' : 's'} — I'll check in on ${goals.length == 1 ? 'it' : 'them'} as you go.";
+      case _consentStep:
+        return draft.consentGiven == true ? "Thank you. That's everything I need." : null;
+      default:
+        return null;
+    }
+  }
+
+  MascotState _mascotFor(int step, dynamic draft) {
+    if (step == _stepCount - 1) return MascotState.celebrating;
+    if (step == 1 && draft.allergies.isNotEmpty) return MascotState.alerting;
+    if (_reactionFor(step, draft) != null) return MascotState.remembering;
+    return MascotState.idle;
+  }
+
+  static String _joinNicely(List<String> items) {
+    if (items.length == 1) return items.first;
+    if (items.length == 2) return '${items[0]} and ${items[1]}';
+    return '${items.sublist(0, items.length - 1).join(', ')} and ${items.last}';
   }
 
   Future<void> _finish() async {
@@ -114,22 +174,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const MoMascot(state: MascotState.idle, size: 46),
+                      MoMascot(state: _mascotFor(_step, draft), size: 46),
                       const SizedBox(width: 11),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-                          decoration: BoxDecoration(
-                            color: HealthColors.surface,
-                            border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(18),
-                              topRight: Radius.circular(18),
-                              bottomRight: Radius.circular(18),
-                              bottomLeft: Radius.circular(5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: HealthColors.surface,
+                                border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(18),
+                                  topRight: Radius.circular(18),
+                                  bottomRight: Radius.circular(18),
+                                  bottomLeft: Radius.circular(5),
+                                ),
+                              ),
+                              child: Text(_prompts[_step], style: HealthTypography.body(fontSize: 15)),
                             ),
-                          ),
-                          child: Text(_prompts[_step], style: HealthTypography.body(fontSize: 15)),
+                            _ReactionBubble(text: _reactionFor(_step, draft)),
+                          ],
                         ),
                       ),
                     ],
@@ -150,6 +216,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const _LabScanStep(),
                   _GoalsStep(draft: draft, controller: controller),
                   _ConsentStep(draft: draft, controller: controller, error: _error),
+                  _FinishStep(draft: draft, error: _error),
                 ],
               ),
             ),
@@ -161,7 +228,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     TextButton(onPressed: () => _goTo(_step - 1), child: const Text('Back')),
                   const Spacer(),
                   ElevatedButton(
-                    onPressed: (_submitting || (_step == _stepCount - 1 && !draft.consentGiven))
+                    onPressed: (_submitting || (_step == _consentStep && !draft.consentGiven))
                         ? null
                         : () {
                             if (_step < _stepCount - 1) {
@@ -172,9 +239,157 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           },
                     child: Text(_submitting
                         ? 'Saving…'
-                        : (_step < _stepCount - 1 ? 'Continue' : "I'm ready")),
+                        : (_step == _stepCount - 1 ? "Let's begin" : 'Continue')),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Mo's reaction to what you just entered — fades/slides in when there's
+/// something real to say, and quietly collapses when there isn't.
+class _ReactionBubble extends StatelessWidget {
+  const _ReactionBubble({required this.text});
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOut,
+      alignment: Alignment.topLeft,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOut,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, -0.15), end: Offset.zero).animate(animation),
+            child: child,
+          ),
+        ),
+        child: text == null
+            ? const SizedBox(width: double.infinity)
+            : Padding(
+                key: ValueKey(text),
+                padding: const EdgeInsets.only(top: 7),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: const BoxDecoration(
+                    color: HealthColors.reactionBubble,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(5),
+                    ),
+                  ),
+                  child: Text(
+                    text!,
+                    style: HealthTypography.body(fontSize: 13, color: HealthColors.reactionText),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// The payoff screen — a recap of everything actually captured, so the flow
+/// ends on "here's what I know about you now" rather than just stopping.
+class _FinishStep extends StatelessWidget {
+  const _FinishStep({required this.draft, this.error});
+  final dynamic draft;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final vitals = Map<String, dynamic>.from(draft.baselineVitals);
+    final basics = [
+      if (vitals['age'] != null) '${vitals['age']} yrs',
+      if (vitals['height_cm'] != null) '${vitals['height_cm']} cm',
+      if (vitals['weight_kg'] != null) '${vitals['weight_kg']} kg',
+    ].join(' · ');
+    final baseline = [
+      if (vitals['bp_systolic'] != null && vitals['bp_diastolic'] != null)
+        '${vitals['bp_systolic']}/${vitals['bp_diastolic']}',
+      if (vitals['glucose_mg_dl'] != null) '${vitals['glucose_mg_dl']} mg/dL',
+    ].join(' · ');
+    final allergyNames = draft.allergies.map((a) => a.name as String).toList().cast<String>();
+    final conditions = List<String>.from(draft.conditions);
+    final medications = List<String>.from(draft.medications);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(HealthSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _RecapRow(label: 'Basics', value: basics.isEmpty ? '—' : basics),
+          _RecapRow(label: 'Conditions', value: conditions.isEmpty ? 'None' : conditions.join(', ')),
+          _RecapRow(
+            label: 'Hard flags',
+            value: allergyNames.isEmpty ? 'None' : allergyNames.join(', '),
+            highlight: allergyNames.isNotEmpty,
+          ),
+          _RecapRow(label: 'Medications', value: medications.isEmpty ? 'None' : '${medications.length} tracked'),
+          _RecapRow(label: 'Baseline', value: baseline.isEmpty ? '—' : baseline),
+          _RecapRow(
+            label: draft.goals.length == 1 ? 'Goal' : 'Goals',
+            value: draft.goals.isEmpty ? 'None yet' : '${draft.goals.length} set',
+          ),
+          const SizedBox(height: HealthSpacing.md),
+          Text(
+            'You can change any of this later from your Medical Profile — nothing here is locked in.',
+            style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted),
+          ),
+          if (error != null) ...[
+            const SizedBox(height: HealthSpacing.md),
+            AlertBanner(message: error!, hard: false),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecapRow extends StatelessWidget {
+  const _RecapRow({required this.label, required this.value, this.highlight = false});
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+        decoration: BoxDecoration(
+          color: highlight ? const Color(0xFFFDEEE4) : HealthColors.surface,
+          border: Border.all(
+            color: highlight
+                ? HealthColors.accentPrimary.withValues(alpha: 0.35)
+                : HealthColors.inkPrimary.withValues(alpha: 0.09),
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 96, child: Text(label, style: HealthTypography.label())),
+            Expanded(
+              child: Text(
+                value,
+                style: HealthTypography.body(
+                  fontSize: 13.5,
+                  color: highlight ? HealthColors.accentPrimaryDark : HealthColors.inkPrimary,
+                ),
               ),
             ),
           ],
@@ -265,7 +480,11 @@ class _BasicsStep extends StatelessWidget {
   }
 }
 
-class _VitalField extends StatelessWidget {
+/// Owns its own TextEditingController and keeps a stable widget identity.
+/// (It used to be a StatelessWidget with `key: ValueKey('$vitalKey-$value')`
+/// and `initialValue` — so every keystroke changed the key, Flutter tore the
+/// field down and rebuilt it, and the keyboard closed after one character.)
+class _VitalField extends StatefulWidget {
   const _VitalField({
     required this.label,
     required this.vitalKey,
@@ -283,18 +502,36 @@ class _VitalField extends StatelessWidget {
   final TextInputType keyboardType;
 
   @override
+  State<_VitalField> createState() => _VitalFieldState();
+}
+
+class _VitalFieldState extends State<_VitalField> {
+  late final TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.draft.baselineVitals[widget.vitalKey]?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final value = draft.baselineVitals[vitalKey]?.toString() ?? '';
-    return TextFormField(
-      key: ValueKey('$vitalKey-${draft.baselineVitals[vitalKey]}'),
-      initialValue: value,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label, hintText: hint),
+    return TextField(
+      controller: _textController,
+      keyboardType: widget.keyboardType,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
       onChanged: (v) {
-        if (keyboardType == TextInputType.number) {
-          controller.updateVital(vitalKey, int.tryParse(v) ?? v);
+        if (widget.keyboardType == TextInputType.number) {
+          widget.controller.updateVital(widget.vitalKey, int.tryParse(v) ?? v);
         } else {
-          controller.updateVital(vitalKey, v);
+          widget.controller.updateVital(widget.vitalKey, v);
         }
       },
     );
