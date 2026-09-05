@@ -33,6 +33,17 @@ def register_builtin_types() -> None:
 
     register_type(
         LogTypeDefinition(
+            name="hydration",
+            description="Water or another drink the user consumed, for fluid tracking",
+            schema={
+                "volume_ml": {"type": "number", "required": True},
+                "beverage": {"type": "str", "required": False},
+            },
+        )
+    )
+
+    register_type(
+        LogTypeDefinition(
             name="mood",
             description="How the user is feeling emotionally",
             schema={

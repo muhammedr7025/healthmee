@@ -1,12 +1,11 @@
-import json
-
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
-from app.common.llm.prompting import build_system_prompt, build_tool_schema
+from app.common.llm.json_utils import parse_json_loose
+from app.common.llm.prompting import build_system_prompt
 
 
 class GeminiProvider(LLMProvider):
-    """Uses Gemini's JSON-mode structured output (response_schema) rather than
-    function calling — simpler and equally reliable for pure extraction.
+    """Uses Gemini's JSON output mode with the shape specified in the prompt,
+    rather than function calling or a rigid response_schema.
     """
 
     def __init__(self, api_key: str, model: str):
@@ -23,40 +22,66 @@ class GeminiProvider(LLMProvider):
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
     ) -> ExtractionResult:
-        tool = build_tool_schema(type_catalog)
-        system = build_system_prompt(type_catalog)
+        type_names = [t["name"] for t in type_catalog]
+        # Deliberately NOT using response_schema: the entry payload differs per
+        # log type, so it's an object with no fixed properties — and Gemini
+        # rejects an OBJECT schema without properties. JSON mode plus an
+        # explicit shape in the prompt gets the same result without that limit.
+        system = (
+            f"{build_system_prompt(type_catalog)}\n\n"
+            "Respond with JSON only, in exactly this shape:\n"
+            '{"entries": [{"type": "<one of: ' + ", ".join(type_names) + '>", '
+            '"payload": {<fields for that type>}, "summary": "<short one-liner>"}], '
+            '"reply": "<short warm confirmation>"}\n'
+            'If nothing is loggable, use {"entries": [], "reply": "..."}.'
+        )
 
         model = self._genai.GenerativeModel(
             self._model_name,
             system_instruction=system,
-            generation_config={
-                "response_mime_type": "application/json",
-                "response_schema": tool["input_schema"],
-            },
+            generation_config={"response_mime_type": "application/json"},
         )
 
         content = _content(text or "What's in this photo? Log it.", image_bytes, image_mime_type)
-        response = model.generate_content(content)
-        data = json.loads(response.text)
+        try:
+            response = model.generate_content(content)
+            data = parse_json_loose(response.text)
+        except Exception:
+            # A provider hiccup shouldn't lose the user's message outright.
+            return ExtractionResult(
+                entries=[],
+                reply="I couldn't read that just now — mind saying it another way?",
+            )
+
         entries = [
-            ExtractedEntry(type=e["type"], payload=e.get("payload", {}), summary=e.get("summary", ""))
-            for e in data.get("entries", [])
+            ExtractedEntry(type=e["type"], payload=e.get("payload", {}) or {}, summary=e.get("summary", ""))
+            for e in (data.get("entries") or [])
+            if isinstance(e, dict) and e.get("type") in type_names
         ]
         return ExtractionResult(entries=entries, reply=data.get("reply", ""))
 
     def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
         try:
-            model = self._genai.GenerativeModel(self._model_name)
+            model = self._genai.GenerativeModel(
+                self._model_name,
+                generation_config={"response_mime_type": "application/json"},
+            )
             content = _content(
-                "This is a photo of a lab report. Extract every test result you can read as a JSON array "
-                'of objects: [{"test_name": str, "value": str, "unit": str or null}]. '
-                "Return ONLY the JSON array, no other text. If you can't read any values, return [].",
+                "This is a photo of a lab report. Read every test result you can and return a JSON "
+                'array of objects: [{"test_name": str, "value": str, "unit": str or null}]. '
+                "Values must be exactly as printed. If you can't read any values, return [].",
                 image_bytes,
                 image_mime_type,
             )
             response = model.generate_content(content)
-            data = json.loads(response.text)
-            return [d for d in data if isinstance(d, dict) and d.get("test_name") and d.get("value")]
+            data = parse_json_loose(response.text)
+            if isinstance(data, dict):  # some responses wrap the array in a key
+                data = next((v for v in data.values() if isinstance(v, list)), [])
+            return [
+                {"test_name": str(d["test_name"]), "value": str(d["value"]), "unit": d.get("unit")}
+                for d in data
+                if isinstance(d, dict) and d.get("test_name") and d.get("value") is not None
+            ]
         except Exception:
             return []
 

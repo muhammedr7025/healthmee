@@ -60,15 +60,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     return Scaffold(
+      // AppShell's Scaffold already shrinks this screen's box for the
+      // keyboard; applying the inset again here too pushed the input bar and
+      // bottom nav up by double the keyboard height, which read as the nav
+      // bar vanishing with no way back.
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
             _ChatHeader(streak: streak, thinking: chatState.isThinking),
             Expanded(
               child: chatState.items.isEmpty
-                  ? const _EmptyState()
+                  ? GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => FocusScope.of(context).unfocus(),
+                      child: const _EmptyState(),
+                    )
                   : ListView(
                       controller: _scrollController,
+                      // Swiping the thread dismisses the keyboard — the main
+                      // way back out to the nav bar while typing.
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.sm, HealthSpacing.md, HealthSpacing.sm),
                       children: [
                         Center(

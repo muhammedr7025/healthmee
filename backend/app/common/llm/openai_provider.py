@@ -2,6 +2,7 @@ import base64
 import json
 
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
+from app.common.llm.json_utils import parse_json_loose
 from app.common.llm.prompting import build_system_prompt, build_tool_schema
 
 
@@ -70,7 +71,7 @@ class OpenAIProvider(LLMProvider):
                 ],
             )
             text = (response.choices[0].message.content or "").strip()
-            data = json.loads(text)
+            data = parse_json_loose(text)
             return [d for d in data if isinstance(d, dict) and d.get("test_name") and d.get("value")]
         except Exception:
             return []

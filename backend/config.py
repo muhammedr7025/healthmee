@@ -35,7 +35,7 @@ class Config:
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
     OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
     GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-    GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-1.5-flash")
+    GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash")
 
     # Billing / subscriptions (Stripe). With no STRIPE_SECRET_KEY set, billing
     # runs in "mock" mode: checkout instantly marks the account premium and no
