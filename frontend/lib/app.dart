@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
@@ -13,6 +14,15 @@ class HealthApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
+
+    // A little tap the moment the splash screen hands off to whatever's
+    // next (welcome, onboarding, or straight into the app) — fires exactly
+    // once per launch, not on every subsequent auth-state change.
+    ref.listen<AuthStatus>(authControllerProvider.select((s) => s.status), (previous, next) {
+      if (previous == AuthStatus.checking && next != AuthStatus.checking) {
+        HapticFeedback.mediumImpact();
+      }
+    });
 
     return MaterialApp(
       title: 'Health MEE',

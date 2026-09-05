@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../media/data/media_repository.dart';
@@ -117,6 +116,7 @@ class ChatController extends StateNotifier<ChatState> {
           ChatThreadItem.alert(message: alert['message'] as String, hard: alert['severity'] == 'hard'),
         if (result.reply.isNotEmpty) ChatThreadItem.assistantReply(result.reply),
       ];
+      if (result.reply.isNotEmpty) HapticFeedback.lightImpact(); // a little tap the moment MeMe answers back
       state = state.copyWith(items: [...state.items, ...newItems], isThinking: false);
     } catch (e) {
       state = state.copyWith(
