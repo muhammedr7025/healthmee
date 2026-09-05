@@ -111,13 +111,15 @@ flutter pub get
 flutter run
 ```
 
-By default the app points at `http://localhost:5000/api/v1` (iOS simulator/desktop) or
-`http://10.0.2.2:5000/api/v1` (Android emulator, which aliases the host machine) — see
-`lib/core/api/api_config.dart`. If you're running the Docker Compose stack as-is (host port 5001), override
-with:
+By default the app points at the deployed production API — the one a real device (or a plain `flutter run`
+with no flags) actually needs, since "localhost" from a physical phone means the phone itself, not this
+machine. See `lib/core/api/api_config.dart`. To point a local run at the Docker Compose stack instead
+(host port 5001) or a local `flask run` (see above), override explicitly:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:5001/api/v1
+# Android emulator (aliases the host machine rather than the emulator itself):
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5001/api/v1
 ```
 
 Run tests/analysis:
