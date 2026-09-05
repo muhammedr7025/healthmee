@@ -70,7 +70,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             _ChatHeader(streak: streak, thinking: chatState.isThinking),
             Expanded(
-              child: chatState.items.isEmpty
+              child: chatState.isLoadingHistory
+                  ? const SizedBox.shrink()
+                  : chatState.items.isEmpty
                   ? GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => FocusScope.of(context).unfocus(),
@@ -282,7 +284,9 @@ class _ThreadItemView extends ConsumerWidget {
                   bottomLeft: Radius.circular(20),
                   bottomRight: Radius.circular(6),
                 ),
-                child: Image.memory(item.photoBytes!, width: 206, height: 206, fit: BoxFit.cover),
+                child: item.photoBytes != null
+                    ? Image.memory(item.photoBytes!, width: 206, height: 206, fit: BoxFit.cover)
+                    : Image.network(item.photoUrl!, width: 206, height: 206, fit: BoxFit.cover),
               ),
               if (item.text != null) ...[
                 const SizedBox(height: 6),

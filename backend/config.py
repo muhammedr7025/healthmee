@@ -48,6 +48,11 @@ class Config:
     BILLING_CANCEL_URL = os.environ.get("BILLING_CANCEL_URL", "vitachat://billing/cancel")
     FREE_TIER_LOGBOOK_DAYS = int(os.environ.get("FREE_TIER_LOGBOOK_DAYS", 30))
 
+    # Chat history: how long the thread can go quiet before reopening the
+    # app greets the user with a "we missed you" nudge instead of just
+    # picking back up in silence.
+    CHAT_IDLE_GREETING_HOURS = int(os.environ.get("CHAT_IDLE_GREETING_HOURS", 6))
+
     # Push notifications (Firebase Cloud Messaging). Leave unset to run in
     # "mock" mode: the reminder scheduler still runs on its real triggers,
     # but delivery is just a logged PushLog row instead of a real device

@@ -10,7 +10,7 @@ from app.billing.models import Subscription
 from app.caregiver.models import CaregiverLink
 from app.extensions import db
 from app.goals.models import Goal
-from app.logging.models import LogEntry
+from app.logging.models import ChatMessage, LogEntry
 from app.media.models import MediaAsset
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.notifications.models import AlertLog, NotificationPreference
@@ -31,6 +31,7 @@ def export_account_data(user_id: str) -> dict:
         "allergies": [a.to_dict() for a in Allergy.query.filter_by(user_id=user_id).all()],
         "lab_results": [l.to_dict() for l in LabResult.query.filter_by(user_id=user_id).all()],
         "log_entries": [e.to_dict() for e in LogEntry.query.filter_by(user_id=user_id).all()],
+        "chat_messages": [m.to_dict() for m in ChatMessage.query.filter_by(user_id=user_id).all()],
         "goals": [g.to_dict() for g in Goal.query.filter_by(user_id=user_id).all()],
         "alerts": [a.to_dict() for a in AlertLog.query.filter_by(user_id=user_id).all()],
         "caregiver_links": [
@@ -48,8 +49,9 @@ def delete_account(user_id: str) -> None:
     uploaded to MinIO/S3) is not swept — the DB rows referencing them are
     removed, but the underlying files aren't deleted from the bucket.
     """
-    LogEntry.query.filter_by(user_id=user_id).delete()
+    ChatMessage.query.filter_by(user_id=user_id).delete()
     AlertLog.query.filter_by(user_id=user_id).delete()
+    LogEntry.query.filter_by(user_id=user_id).delete()
     Allergy.query.filter_by(user_id=user_id).delete()
     LabResult.query.filter_by(user_id=user_id).delete()
     MedicalProfile.query.filter_by(user_id=user_id).delete()

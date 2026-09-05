@@ -8,20 +8,73 @@ import '../domain/chat_thread_item.dart';
 import '../domain/log_row_formatter.dart';
 
 class ChatState {
-  const ChatState({this.items = const [], this.isThinking = false});
+  const ChatState({this.items = const [], this.isThinking = false, this.isLoadingHistory = true});
 
   final List<ChatThreadItem> items;
   final bool isThinking;
+  // True only for the brief window while the persisted thread is being
+  // fetched on launch — lets the screen hold off on showing the "nothing
+  // logged yet" empty state, which would otherwise flash before a returning
+  // user's real history arrives and looks exactly like the history-loss bug.
+  final bool isLoadingHistory;
 
-  ChatState copyWith({List<ChatThreadItem>? items, bool? isThinking}) =>
-      ChatState(items: items ?? this.items, isThinking: isThinking ?? this.isThinking);
+  ChatState copyWith({List<ChatThreadItem>? items, bool? isThinking, bool? isLoadingHistory}) => ChatState(
+        items: items ?? this.items,
+        isThinking: isThinking ?? this.isThinking,
+        isLoadingHistory: isLoadingHistory ?? this.isLoadingHistory,
+      );
 }
 
 class ChatController extends StateNotifier<ChatState> {
-  ChatController(this._repo, this._mediaRepo) : super(const ChatState());
+  ChatController(this._repo, this._mediaRepo) : super(const ChatState()) {
+    _loadHistory();
+  }
 
   final ChatRepository _repo;
   final MediaRepository _mediaRepo;
+
+  /// Restores the thread on launch so closing and reopening the app doesn't
+  /// wipe it — plus MiMi's "we missed you" nudge when the thread's been
+  /// quiet long enough, tacked on as the newest bubble.
+  Future<void> _loadHistory() async {
+    try {
+      final history = await _repo.fetchHistory();
+      state = state.copyWith(
+        items: [
+          for (final raw in history.items) _fromHistoryJson(raw),
+          if (history.welcomeBackMessage != null) ChatThreadItem.assistantReply(history.welcomeBackMessage!),
+        ],
+        isLoadingHistory: false,
+      );
+    } catch (_) {
+      // Offline, or the token isn't ready yet — thread just starts empty,
+      // same as before this existed; sending a message still works.
+      state = state.copyWith(isLoadingHistory: false);
+    }
+  }
+
+  ChatThreadItem _fromHistoryJson(Map<String, dynamic> json) {
+    switch (json['kind'] as String?) {
+      case 'user_text':
+        return ChatThreadItem.userText(json['text'] as String? ?? '');
+      case 'user_photo':
+        return ChatThreadItem.userPhoto(photoUrl: json['photo_url'] as String?, caption: json['text'] as String?);
+      case 'alert':
+        return ChatThreadItem.alert(message: json['message'] as String? ?? '', hard: json['severity'] == 'hard');
+      case 'extract_card':
+        final logType = json['log_type'] as String? ?? '';
+        return ChatThreadItem.extractCard(
+          entryId: json['entry_id'] as String,
+          logType: logType,
+          summary: extractCardLabel(logType),
+          rows: formatLogRows(logType, Map<String, dynamic>.from(json['payload'] as Map? ?? {})),
+          confirmed: true,
+        );
+      case 'assistant_reply':
+      default:
+        return ChatThreadItem.assistantReply(json['text'] as String? ?? '');
+    }
+  }
 
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
@@ -35,7 +88,7 @@ class ChatController extends StateNotifier<ChatState> {
   /// mock mode honestly says it can't see it.
   Future<void> sendPhoto(Uint8List bytes, {String caption = ''}) async {
     state = state.copyWith(
-      items: [...state.items, ChatThreadItem.userPhoto(bytes, caption: caption.isEmpty ? null : caption)],
+      items: [...state.items, ChatThreadItem.userPhoto(bytes: bytes, caption: caption.isEmpty ? null : caption)],
       isThinking: true,
     );
     try {

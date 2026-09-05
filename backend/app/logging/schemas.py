@@ -29,6 +29,15 @@ class ChatResponseSchema(Schema):
     validation_errors = fields.List(fields.String(), dump_only=True)
 
 
+class ChatHistoryQuerySchema(Schema):
+    limit = fields.Integer(required=False, load_default=200)
+
+
+class ChatHistorySchema(Schema):
+    items = fields.List(fields.Dict(), dump_only=True)
+    welcome_back_message = fields.String(dump_only=True, allow_none=True)
+
+
 class LogbookQuerySchema(Schema):
     type = fields.String(required=False, allow_none=True)
     start = fields.DateTime(required=False, allow_none=True)

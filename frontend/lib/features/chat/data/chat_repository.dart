@@ -17,10 +17,27 @@ class ChatExtractionResult {
       );
 }
 
+class ChatHistoryResult {
+  const ChatHistoryResult({required this.items, required this.welcomeBackMessage});
+
+  final List<Map<String, dynamic>> items;
+  final String? welcomeBackMessage;
+
+  factory ChatHistoryResult.fromJson(Map<String, dynamic> json) => ChatHistoryResult(
+        items: List<Map<String, dynamic>>.from(json['items'] as List? ?? []),
+        welcomeBackMessage: json['welcome_back_message'] as String?,
+      );
+}
+
 class ChatRepository {
   ChatRepository(this._dio);
 
   final Dio _dio;
+
+  Future<ChatHistoryResult> fetchHistory() async {
+    final resp = await _dio.get('/chat/messages');
+    return ChatHistoryResult.fromJson(resp.data as Map<String, dynamic>);
+  }
 
   Future<ChatExtractionResult> sendMessage(String text, {String? mediaAssetId}) async {
     final resp = await _dio.post('/chat/messages', data: {'text': text, 'media_asset_id': ?mediaAssetId});

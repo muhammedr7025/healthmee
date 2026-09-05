@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 from flask import current_app
 
 from app.accounts.models import User
 from app.common.llm import get_llm_provider
 from app.common.llm.mock_provider import MockProvider
+from app.common.models import utcnow
 from app.extensions import db
-from app.logging.models import LogEntry
+from app.logging.models import ChatMessage, LogEntry
 from app.logging.registry import get_type, get_type_catalog, sanitize_payload, validate_payload
 from app.media.models import MediaAsset
 from app.media.storage import download_bytes
@@ -92,6 +95,9 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         created_entries.append(log_entry)
         touched_dates.add(log_entry.timestamp.date())
 
+    db.session.flush()  # assign ids to alerts before the transcript rows reference them
+    _record_chat_transcript(user, text, media_asset_id, created_entries, all_alerts, result.reply)
+
     db.session.commit()
 
     if touched_dates:
@@ -106,3 +112,28 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         "reply": result.reply,
         "validation_errors": validation_errors,
     }
+
+
+def _record_chat_transcript(user, text, media_asset_id, created_entries, alerts, reply) -> None:
+    """Persists every bubble this turn produced, in display order, so the
+    thread survives an app restart (see ChatMessage). Timestamps are
+    staggered by a microsecond per row since several rows are otherwise
+    created within the same wall-clock tick, and replay order depends on
+    created_at.
+    """
+    rows: list[ChatMessage] = []
+    if media_asset_id:
+        rows.append(ChatMessage(user_id=user.id, kind="user_photo", text=text or None, media_asset_id=media_asset_id))
+    elif text:
+        rows.append(ChatMessage(user_id=user.id, kind="user_text", text=text))
+    for entry in created_entries:
+        rows.append(ChatMessage(user_id=user.id, kind="extract_card", log_entry_id=entry.id))
+    for alert in alerts:
+        rows.append(ChatMessage(user_id=user.id, kind="alert", alert_id=alert.id))
+    if reply:
+        rows.append(ChatMessage(user_id=user.id, kind="assistant_reply", text=reply))
+
+    base = utcnow()
+    for i, row in enumerate(rows):
+        row.created_at = base + timedelta(microseconds=i)
+        db.session.add(row)

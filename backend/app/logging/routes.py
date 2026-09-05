@@ -8,9 +8,12 @@ from flask_smorest import Blueprint
 from app.accounts.models import User
 from app.billing.service import is_premium
 from app.extensions import db
+from app.logging.chat_history import get_chat_history
 from app.logging.extraction.pipeline import process_message
 from app.logging.models import LogEntry
 from app.logging.schemas import (
+    ChatHistoryQuerySchema,
+    ChatHistorySchema,
     ChatMessageSchema,
     ChatResponseSchema,
     LogbookQuerySchema,
@@ -23,6 +26,12 @@ blp = Blueprint("logging", __name__, url_prefix="/api/v1", description="Chat log
 
 @blp.route("/chat/messages")
 class ChatMessages(MethodView):
+    @jwt_required()
+    @blp.arguments(ChatHistoryQuerySchema, location="query")
+    @blp.response(200, ChatHistorySchema)
+    def get(self, args):
+        return get_chat_history(get_jwt_identity(), args["limit"])
+
     @jwt_required()
     @blp.arguments(ChatMessageSchema)
     @blp.response(201, ChatResponseSchema)
