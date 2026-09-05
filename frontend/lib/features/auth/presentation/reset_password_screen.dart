@@ -90,8 +90,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MemeMascot(state: mood, size: 58),
-                  const SizedBox(width: HealthSpacing.sm),
+                  MascotHalo(state: mood, size: 74),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),

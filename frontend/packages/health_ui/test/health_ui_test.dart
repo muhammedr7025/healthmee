@@ -13,6 +13,17 @@ void main() {
     }
   });
 
+  testWidgets('MascotHalo renders in every named state', (tester) async {
+    for (final state in MascotState.values) {
+      await tester.pumpWidget(
+        MaterialApp(theme: HealthTheme.light(), home: Scaffold(body: MascotHalo(state: state))),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(MascotHalo), findsOneWidget);
+      expect(find.byType(MemeMascot), findsOneWidget);
+    }
+  });
+
   testWidgets('LogConfirmationCard and AlertBanner render', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

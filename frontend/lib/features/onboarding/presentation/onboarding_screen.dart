@@ -180,7 +180,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      MemeMascot(state: _mascotFor(_step, draft), size: 46),
+                      MascotHalo(state: _mascotFor(_step, draft), size: 46),
                       const SizedBox(width: 11),
                       Expanded(
                         child: Column(
@@ -248,7 +248,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           },
                     child: Text(_submitting
                         ? 'Saving…'
-                        : (_step == _stepCount - 1 ? "Let's begin" : 'Continue')),
+                        : (_step == _stepCount - 1 ? 'Say hello to MeMe' : 'Continue')),
                   ),
                 ],
               ),
@@ -334,11 +334,29 @@ class _FinishStep extends StatelessWidget {
     final conditions = List<String>.from(draft.conditions);
     final medications = List<String>.from(draft.medications);
 
+    final name = (draft.fullName as String).trim();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(HealthSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: Column(
+              children: [
+                const MemeMascot(state: MascotState.celebrating, size: 96),
+                const SizedBox(height: 14),
+                Text(name.isEmpty ? "You're set." : "You're set, $name.", style: HealthTypography.display(fontSize: 26)),
+                const SizedBox(height: 8),
+                Text(
+                  "Here's what I'll hold in mind from now on. Change any of it in your profile.",
+                  style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: HealthSpacing.lg),
           _RecapRow(label: 'Basics', value: basics.isEmpty ? '—' : basics),
           _RecapRow(label: 'Conditions', value: conditions.isEmpty ? 'None' : conditions.join(', ')),
           _RecapRow(

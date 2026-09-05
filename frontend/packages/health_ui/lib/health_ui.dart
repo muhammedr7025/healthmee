@@ -10,6 +10,7 @@ export 'src/components/health_switch.dart';
 export 'src/components/log_confirmation_card.dart';
 export 'src/components/alert_banner.dart';
 
+export 'src/mascot/mascot_halo.dart';
 export 'src/mascot/mascot_state.dart';
 export 'src/mascot/meme_mascot.dart';
 

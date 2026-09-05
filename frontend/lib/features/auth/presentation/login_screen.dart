@@ -60,9 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
               Center(
                 child: Column(
                   children: [
-                    const MemeMascot(state: MascotState.love, size: 150),
-                    Text('I missed you', style: HealthTypography.display(fontSize: 25)),
-                    const SizedBox(height: 6),
+                    const MascotHalo(state: MascotState.love, size: 140),
+                    const SizedBox(height: 4),
+                    Text('I missed you', style: HealthTypography.display(fontSize: 26)),
+                    const SizedBox(height: 8),
                     Text(
                       'Your logs are exactly where you left them.',
                       style: HealthTypography.body(fontSize: 14, color: HealthColors.inkMuted),

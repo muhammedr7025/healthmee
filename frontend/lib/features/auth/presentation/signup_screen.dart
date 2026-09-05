@@ -60,8 +60,8 @@ class _SignupScreenState extends State<SignupScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const MemeMascot(state: MascotState.excited, size: 58),
-                  const SizedBox(width: HealthSpacing.sm),
+                  const MascotHalo(state: MascotState.excited, size: 74),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
@@ -80,7 +80,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: HealthSpacing.lg),
+              const SizedBox(height: 18),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
