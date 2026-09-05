@@ -110,7 +110,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                const MemeMascot(state: MascotState.idle, size: 44),
+                const MemeMascot(state: MascotState.happy, size: 44),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

@@ -123,7 +123,7 @@ class _ChatHeader extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: const BoxDecoration(color: HealthColors.chipIdle, shape: BoxShape.circle),
-            child: MemeMascot(state: thinking ? MascotState.thinking : MascotState.idle, size: 40),
+            child: MemeMascot(state: thinking ? MascotState.thinking : MascotState.happy, size: 40),
           ),
           const SizedBox(width: HealthSpacing.sm),
           Expanded(
@@ -172,7 +172,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const MemeMascot(state: MascotState.idle, size: 96),
+            const MemeMascot(state: MascotState.happy, size: 96),
             const SizedBox(height: HealthSpacing.md),
             Text(
               'Nothing logged yet today — tell MeMe what you had for breakfast.',
@@ -313,7 +313,7 @@ class _ThreadItemView extends ConsumerWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const SizedBox(width: 32, child: Center(child: MemeMascot(state: MascotState.idle, size: 30))),
+            const SizedBox(width: 32, child: Center(child: MemeMascot(state: MascotState.happy, size: 30))),
             const SizedBox(width: HealthSpacing.sm),
             Flexible(
               child: Container(
@@ -339,7 +339,7 @@ class _ThreadItemView extends ConsumerWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(width: 32, child: Center(child: MemeMascot(state: MascotState.alerting, size: 30))),
+            const SizedBox(width: 32, child: Center(child: MemeMascot(state: MascotState.concerned, size: 30))),
             const SizedBox(width: HealthSpacing.sm),
             Expanded(
               child: Container(

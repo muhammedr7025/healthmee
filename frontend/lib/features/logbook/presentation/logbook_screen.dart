@@ -163,7 +163,7 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const MemeMascot(state: MascotState.idle, size: 96),
+                              const MemeMascot(state: MascotState.happy, size: 96),
                               const SizedBox(height: HealthSpacing.md),
                               Text(
                                 entries.isEmpty ? 'Nothing here yet — start a conversation with MeMe.' : 'No matches for "$query".',

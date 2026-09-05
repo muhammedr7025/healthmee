@@ -46,6 +46,14 @@ class AuthRepository {
   }
 
   Future<void> logout() => _storage.clearToken();
+
+  Future<void> requestPasswordReset({required String email}) async {
+    await _dio.post('/auth/password/reset-request', data: {'email': email});
+  }
+
+  Future<void> confirmPasswordReset({required String email, required String code, required String newPassword}) async {
+    await _dio.post('/auth/password/reset-confirm', data: {'email': email, 'code': code, 'new_password': newPassword});
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

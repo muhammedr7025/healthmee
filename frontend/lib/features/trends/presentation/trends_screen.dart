@@ -53,7 +53,7 @@ class TrendsScreen extends ConsumerWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const MemeMascot(state: MascotState.idle, size: 96),
+                      const MemeMascot(state: MascotState.happy, size: 96),
                       const SizedBox(height: HealthSpacing.md),
                       Text('Log a few days and trends will start showing up here.',
                           style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
@@ -245,7 +245,7 @@ class _TrendsBody extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const MemeMascot(state: MascotState.remembering, size: 38),
+                const MemeMascot(state: MascotState.curious, size: 38),
                 const SizedBox(width: 12),
                 Expanded(child: Text(trends.callouts.first, style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText))),
               ],
@@ -338,7 +338,7 @@ class _ReadView extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          const MemeMascot(state: MascotState.remembering, size: 42),
+                          const MemeMascot(state: MascotState.curious, size: 42),
                           const SizedBox(width: 11),
                           Expanded(
                             child: Column(

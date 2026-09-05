@@ -22,3 +22,13 @@ class UserSchema(Schema):
 class TokenSchema(Schema):
     access_token = fields.String(dump_only=True)
     user = fields.Nested(UserSchema, dump_only=True)
+
+
+class PasswordResetRequestSchema(Schema):
+    email = fields.Email(required=True)
+
+
+class PasswordResetConfirmSchema(Schema):
+    email = fields.Email(required=True)
+    code = fields.String(required=True)
+    new_password = fields.String(required=True, validate=validate.Length(min=8))

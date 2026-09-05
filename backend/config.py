@@ -60,6 +60,17 @@ class Config:
     # Firebase service-account JSON file to go live.
     FCM_CREDENTIALS_JSON = os.environ.get("FCM_CREDENTIALS_JSON")
 
+    # Email (password reset). Leave SMTP_HOST unset to run in "mock" mode:
+    # the reset flow still issues and validates real tokens, but the email
+    # is just logged server-side instead of actually sent — same fallback
+    # pattern as LLM_PROVIDER=mock.
+    SMTP_HOST = os.environ.get("SMTP_HOST")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+    SMTP_USERNAME = os.environ.get("SMTP_USERNAME")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+    SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "no-reply@healthmee.app")
+    SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() != "false"
+
     API_TITLE = "Health API"
     API_VERSION = "v1"
     OPENAPI_VERSION = "3.0.3"

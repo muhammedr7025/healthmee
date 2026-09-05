@@ -4,7 +4,7 @@ import 'package:health_ui/health_ui.dart';
 
 import 'core/app_shell.dart';
 import 'features/auth/presentation/auth_controller.dart';
-import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/auth_gate.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
 
 class HealthApp extends ConsumerWidget {
@@ -20,7 +20,7 @@ class HealthApp extends ConsumerWidget {
       theme: HealthTheme.light(),
       home: switch (auth.status) {
         AuthStatus.checking => const _SplashScreen(),
-        AuthStatus.unauthenticated => const LoginScreen(),
+        AuthStatus.unauthenticated => const AuthGate(),
         AuthStatus.authenticated =>
           (auth.user?.onboardingCompleted ?? false) ? const AppShell() : const OnboardingScreen(),
       },
@@ -34,7 +34,7 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: MemeMascot(state: MascotState.idle, size: 120)),
+      body: Center(child: MemeMascot(state: MascotState.happy, size: 120)),
     );
   }
 }

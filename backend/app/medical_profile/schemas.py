@@ -42,6 +42,7 @@ class GoalIntakeSchema(Schema):
 
 
 class OnboardingSchema(Schema):
+    full_name = fields.String(required=False, allow_none=True)
     conditions = fields.List(fields.String(), required=False, load_default=list)
     medications = fields.List(fields.String(), required=False, load_default=list)
     allergies = fields.List(fields.Nested(AllergySchema), required=False, load_default=list)

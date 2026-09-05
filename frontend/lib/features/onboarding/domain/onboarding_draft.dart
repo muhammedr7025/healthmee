@@ -23,6 +23,8 @@ class GoalDraft {
 
 class OnboardingDraft {
   const OnboardingDraft({
+    this.fullName = '',
+    this.accountFor = 'Just me',
     this.conditions = const [],
     this.medications = const [],
     this.allergies = const [],
@@ -31,6 +33,14 @@ class OnboardingDraft {
     this.consentGiven = false,
   });
 
+  /// Captured on its own step right after signup rather than at signup
+  /// itself, so the account can exist before we ask anything personal.
+  final String fullName;
+  // "Just me" | "Me and someone I care for" — a first-run signal for who
+  // this profile is for. Doesn't change anything server-side yet (caregiver
+  // access is still set up later, from Settings); it's the answer, kept
+  // for the account setup UI to reflect back.
+  final String accountFor;
   final List<String> conditions;
   final List<String> medications;
   final List<AllergyDraft> allergies;
@@ -39,6 +49,8 @@ class OnboardingDraft {
   final bool consentGiven;
 
   OnboardingDraft copyWith({
+    String? fullName,
+    String? accountFor,
     List<String>? conditions,
     List<String>? medications,
     List<AllergyDraft>? allergies,
@@ -47,6 +59,8 @@ class OnboardingDraft {
     bool? consentGiven,
   }) =>
       OnboardingDraft(
+        fullName: fullName ?? this.fullName,
+        accountFor: accountFor ?? this.accountFor,
         conditions: conditions ?? this.conditions,
         medications: medications ?? this.medications,
         allergies: allergies ?? this.allergies,
@@ -56,6 +70,7 @@ class OnboardingDraft {
       );
 
   Map<String, dynamic> toJson() => {
+        if (fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
         'conditions': conditions,
         'medications': medications,
         'allergies': allergies.map((a) => a.toJson()).toList(),

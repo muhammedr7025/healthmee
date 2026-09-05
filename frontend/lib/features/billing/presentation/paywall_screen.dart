@@ -85,7 +85,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   child: Text('Not now', style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted)),
                 ),
               ),
-              Center(child: MemeMascot(state: sub.isPremium ? MascotState.celebrating : MascotState.idle, size: 96)),
+              Center(child: MemeMascot(state: sub.isPremium ? MascotState.celebrating : MascotState.happy, size: 96)),
               const SizedBox(height: 14),
               Text(
                 sub.isPremium ? "You're on Premium" : 'Let MeMe see everything',

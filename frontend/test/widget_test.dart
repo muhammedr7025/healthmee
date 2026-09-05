@@ -6,7 +6,7 @@ import 'package:health/app.dart';
 import 'package:health/core/api/auth_storage.dart';
 import 'package:health/features/auth/data/auth_repository.dart';
 import 'package:health/features/auth/domain/user.dart';
-import 'package:health/features/auth/presentation/login_screen.dart';
+import 'package:health/features/auth/presentation/welcome_screen.dart';
 
 class _FakeAuthRepository extends AuthRepository {
   _FakeAuthRepository() : super(Dio(), AuthStorage());
@@ -16,7 +16,7 @@ class _FakeAuthRepository extends AuthRepository {
 }
 
 void main() {
-  testWidgets('shows the login screen when logged out', (tester) async {
+  testWidgets('shows the welcome screen when logged out', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [authRepositoryProvider.overrideWithValue(_FakeAuthRepository())],
@@ -29,6 +29,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
     }
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
   });
 }

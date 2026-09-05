@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:health_ui/health_ui.dart';
 
+import 'password_strength.dart';
 import 'social_auth_button.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onSignIn, required this.onForgotPassword, required this.onSignUp});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key, required this.onCreateAccount, required this.onSignIn});
 
-  final Future<void> Function(String email, String password) onSignIn;
-  final VoidCallback onForgotPassword;
-  final VoidCallback onSignUp;
+  final Future<void> Function(String email, String password) onCreateAccount;
+  final VoidCallback onSignIn;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
@@ -34,9 +34,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await widget.onSignIn(_emailController.text.trim(), _passwordController.text);
+      await widget.onCreateAccount(_emailController.text.trim(), _passwordController.text);
     } catch (e) {
-      setState(() => _error = 'Something went wrong — please check your details and try again.');
+      setState(() => _error = "Couldn't create that account — please check your details and try again.");
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -55,21 +55,30 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('WELCOME BACK', style: HealthTypography.label()),
-              const SizedBox(height: HealthSpacing.sm),
-              Center(
-                child: Column(
-                  children: [
-                    const MemeMascot(state: MascotState.love, size: 150),
-                    Text('I missed you', style: HealthTypography.display(fontSize: 25)),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Your logs are exactly where you left them.',
-                      style: HealthTypography.body(fontSize: 14, color: HealthColors.inkMuted),
-                      textAlign: TextAlign.center,
+              Text('CREATE YOUR ACCOUNT', style: HealthTypography.label()),
+              const SizedBox(height: HealthSpacing.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const MemeMascot(state: MascotState.excited, size: 58),
+                  const SizedBox(width: HealthSpacing.sm),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+                      decoration: BoxDecoration(
+                        color: HealthColors.surface,
+                        border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(18),
+                          topRight: Radius.circular(18),
+                          bottomRight: Radius.circular(18),
+                          bottomLeft: Radius.circular(5),
+                        ),
+                      ),
+                      child: Text('An email and a password, and your logs are safe with me.', style: HealthTypography.body(fontSize: 14.5)),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const SizedBox(height: HealthSpacing.lg),
               TextField(
@@ -83,24 +92,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
+                  hintText: 'At least 8 characters',
                   suffixIcon: TextButton(
                     onPressed: () => setState(() => _showPassword = !_showPassword),
                     child: Text(_showPassword ? 'Hide' : 'Show'),
                   ),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: widget.onForgotPassword,
-                  child: Text('Forgot password?', style: HealthTypography.body(fontSize: 12.5, color: HealthColors.accentPrimary)),
-                ),
-              ),
+              const SizedBox(height: 6),
+              PasswordStrengthBar(password: _passwordController.text),
+              const SizedBox(height: HealthSpacing.md),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _submitting ? null : _submit,
-                  child: Text(_submitting ? 'Please wait…' : 'Sign in'),
+                  child: Text(_submitting ? 'Please wait…' : 'Create account'),
                 ),
               ),
               if (_error != null) ...[
@@ -122,17 +129,21 @@ class _LoginScreenState extends State<LoginScreen> {
               SocialAuthButton(mark: 'G', label: 'Continue with Google', onTap: () => _comingSoon('Google sign-in')),
               const SizedBox(height: HealthSpacing.sm),
               SocialAuthButton(mark: 'A', label: 'Continue with Apple', onTap: () => _comingSoon('Apple sign-in')),
-              const SizedBox(height: HealthSpacing.lg),
+              const SizedBox(height: HealthSpacing.xl),
+              Text(
+                'By continuing you agree to the Terms and Privacy Policy. Your health data is never sold.',
+                style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkFaint),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: HealthSpacing.sm),
               Center(
                 child: TextButton(
-                  onPressed: widget.onSignUp,
+                  onPressed: widget.onSignIn,
                   child: Text.rich(
                     TextSpan(
-                      text: 'New here? ',
+                      text: 'Already with us? ',
                       style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted),
-                      children: [
-                        TextSpan(text: 'Create an account', style: HealthTypography.body(fontSize: 13, color: HealthColors.accentPrimary)),
-                      ],
+                      children: [TextSpan(text: 'Sign in', style: HealthTypography.body(fontSize: 13, color: HealthColors.accentPrimary))],
                     ),
                   ),
                 ),

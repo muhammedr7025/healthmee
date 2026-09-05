@@ -10,6 +10,10 @@ class OnboardingController extends StateNotifier<OnboardingDraft> {
   final OnboardingRepository _repo;
   final Ref _ref;
 
+  void setFullName(String name) => state = state.copyWith(fullName: name);
+
+  void setAccountFor(String value) => state = state.copyWith(accountFor: value);
+
   void toggleCondition(String condition) {
     final list = List<String>.from(state.conditions);
     list.contains(condition) ? list.remove(condition) : list.add(condition);

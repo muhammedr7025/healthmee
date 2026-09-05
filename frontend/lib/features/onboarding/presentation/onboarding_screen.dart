@@ -38,20 +38,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _submitting = false;
   String? _error;
 
-  static const _stepCount = 8;
-  static const _consentStep = 6;
+  static const _stepCount = 9;
+  static const _consentStep = 7;
   static const _stepLabels = [
     '1 · About you',
-    '2 · Allergies',
-    '3 · Medications',
-    '4 · Baseline vitals',
-    '5 · Lab report',
-    '6 · Your goal',
-    '7 · Privacy',
+    '2 · Basics',
+    '3 · Allergies',
+    '4 · Medications',
+    '5 · Baseline vitals',
+    '6 · Lab report',
+    '7 · Your goal',
+    '8 · Privacy',
     'All set',
   ];
   static const _prompts = [
-    "Let's start with you. Anything you're managing day to day?",
+    'Before anything else — what should I call you?',
+    "Good to meet you. A couple of numbers now means I can show you movement later.",
     "What should I never let slip past? I'll check every meal against this.",
     "Anything you're taking right now? Add as many as you like.",
     "A couple of numbers now means I can show you movement later. All optional.",
@@ -73,6 +75,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   String? _reactionFor(int step, dynamic draft) {
     switch (step) {
       case 0:
+        final name = (draft.fullName as String).trim();
+        if (name.isEmpty) return null;
+        return "Hi $name. I'll only use your name when I check in on you, never to sell you something.";
+      case 1:
         final conditions = List<String>.from(draft.conditions);
         if (conditions.isNotEmpty) {
           return "${_joinNicely(conditions)} — noted. I'll keep that in mind every time you log.";
@@ -82,15 +88,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           return "Got it — that gives me a starting point.";
         }
         return null;
-      case 1:
+      case 2:
         final names = draft.allergies.map((a) => a.name as String).toList().cast<String>();
         if (names.isEmpty) return null;
         return "${_joinNicely(names)} — I'll flag ${names.length == 1 ? 'it' : 'these'} hard, every single time.";
-      case 2:
+      case 3:
         final meds = List<String>.from(draft.medications);
         if (meds.isEmpty) return null;
         return "${meds.length} tracked. I'll remember ${meds.length == 1 ? 'it' : 'them'}.";
-      case 3:
+      case 4:
         final v = Map<String, dynamic>.from(draft.baselineVitals);
         final parts = <String>[];
         if (v['bp_systolic'] != null && v['bp_diastolic'] != null) {
@@ -99,7 +105,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         if (v['glucose_mg_dl'] != null) parts.add('${v['glucose_mg_dl']} mg/dL');
         if (parts.isEmpty) return null;
         return "${parts.join(' · ')} — that's your starting line. We'll measure from here.";
-      case 5:
+      case 6:
         final goals = draft.goals;
         if (goals.isEmpty) return null;
         return "${goals.length} goal${goals.length == 1 ? '' : 's'} — I'll check in on ${goals.length == 1 ? 'it' : 'them'} as you go.";
@@ -112,9 +118,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   MascotState _mascotFor(int step, dynamic draft) {
     if (step == _stepCount - 1) return MascotState.celebrating;
-    if (step == 1 && draft.allergies.isNotEmpty) return MascotState.alerting;
-    if (_reactionFor(step, draft) != null) return MascotState.remembering;
-    return MascotState.idle;
+    if (step == 2 && draft.allergies.isNotEmpty) return MascotState.concerned;
+    if (_reactionFor(step, draft) != null) return MascotState.curious;
+    return MascotState.happy;
   }
 
   static String _joinNicely(List<String> items) {
@@ -209,6 +215,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
+                  _NameStep(draft: draft, controller: controller),
                   _BasicsStep(draft: draft, controller: controller),
                   _AllergiesStep(draft: draft, controller: controller),
                   _MedicationsStep(draft: draft, controller: controller),
@@ -228,7 +235,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     TextButton(onPressed: () => _goTo(_step - 1), child: const Text('Back')),
                   const Spacer(),
                   ElevatedButton(
-                    onPressed: (_submitting || (_step == _consentStep && !draft.consentGiven))
+                    onPressed: (_submitting ||
+                            (_step == 0 && draft.fullName.trim().isEmpty) ||
+                            (_step == _consentStep && !draft.consentGiven))
                         ? null
                         : () {
                             if (_step < _stepCount - 1) {
@@ -394,6 +403,91 @@ class _RecapRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+const _accountForOptions = [
+  {'label': 'Just me', 'note': 'One profile, one history'},
+  {'label': 'Me and someone I care for', 'note': 'Adds a second profile you can switch between'},
+];
+
+class _NameStep extends StatefulWidget {
+  const _NameStep({required this.draft, required this.controller});
+  final dynamic draft;
+  final OnboardingController controller;
+
+  @override
+  State<_NameStep> createState() => _NameStepState();
+}
+
+class _NameStepState extends State<_NameStep> {
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.draft.fullName);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(HealthSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _nameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Your name', hintText: 'Anand'),
+            onChanged: widget.controller.setFullName,
+          ),
+          const SizedBox(height: HealthSpacing.lg),
+          Text('Who is this account for?', style: HealthTypography.label()),
+          const SizedBox(height: HealthSpacing.sm),
+          ..._accountForOptions.map((option) {
+            final label = option['label']!;
+            final selected = widget.draft.accountFor == label;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
+              child: HealthCard(
+                onTap: () => widget.controller.setAccountFor(label),
+                child: Row(
+                  children: [
+                    Icon(
+                      selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                      color: selected ? HealthColors.accentSecondary : HealthColors.inkMuted,
+                      size: 20,
+                    ),
+                    const SizedBox(width: HealthSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label, style: HealthTypography.body()),
+                          Text(option['note']!, style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkMuted)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: HealthSpacing.sm),
+          Text(
+            'No gender questions here. If a lab range needs it later, I\'ll ask then and tell you why.',
+            style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted),
+          ),
+        ],
       ),
     );
   }

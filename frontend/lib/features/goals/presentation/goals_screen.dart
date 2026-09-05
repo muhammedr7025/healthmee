@@ -138,7 +138,7 @@ class _GoalsBody extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const MemeMascot(state: MascotState.idle, size: 96),
+                  const MemeMascot(state: MascotState.happy, size: 96),
                   const SizedBox(height: HealthSpacing.md),
                   Text('No goals yet — tap + to set one with MeMe.',
                       style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
@@ -314,7 +314,7 @@ class _GoalCardState extends ConsumerState<_GoalCard> {
         children: [
           Row(
             children: [
-              MemeMascot(state: _celebrating ? MascotState.celebrating : MascotState.idle, size: 32),
+              MemeMascot(state: _celebrating ? MascotState.celebrating : MascotState.happy, size: 32),
               const SizedBox(width: 8),
               Expanded(child: Text(_goalTypeLabels[goal.type] ?? goal.type, style: HealthTypography.body(fontSize: 14.5, weight: FontWeight.w500))),
               if (goal.status == 'active')

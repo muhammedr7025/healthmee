@@ -31,6 +31,8 @@ class Onboarding(MethodView):
     @blp.response(201, MedicalProfileSchema)
     def post(self, data):
         user = User.query.get_or_404(get_jwt_identity())
+        if data.get("full_name"):
+            user.full_name = data["full_name"]
 
         profile = MedicalProfile(
             user_id=user.id,
