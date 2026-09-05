@@ -83,7 +83,7 @@ class OpenAIProvider(LLMProvider):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are MiMi, a warm, non-clinical health journal companion. Write 2-4 "
+                        "content": "You are MeMe, a warm, non-clinical health journal companion. Write 2-4 "
                         "short sentences, plain prose, no markdown, no diagnosis language.",
                     },
                     {"role": "user", "content": prompt},

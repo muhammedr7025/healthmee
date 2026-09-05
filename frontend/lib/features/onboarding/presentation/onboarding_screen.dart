@@ -67,7 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _pageController.animateToPage(step, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
-  /// MiMi's follow-up bubble — reacts to what's actually been entered so far,
+  /// MeMe's follow-up bubble — reacts to what's actually been entered so far,
   /// so the flow answers back instead of just marching through forms. Every
   /// line is derived from real draft data; nothing is said that isn't true.
   String? _reactionFor(int step, dynamic draft) {
@@ -174,7 +174,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      MimiMascot(state: _mascotFor(_step, draft), size: 46),
+                      MemeMascot(state: _mascotFor(_step, draft), size: 46),
                       const SizedBox(width: 11),
                       Expanded(
                         child: Column(
@@ -251,7 +251,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 }
 
-/// MiMi's reaction to what you just entered — fades/slides in when there's
+/// MeMe's reaction to what you just entered — fades/slides in when there's
 /// something real to say, and quietly collapses when there isn't.
 class _ReactionBubble extends StatelessWidget {
   const _ReactionBubble({required this.text});
@@ -828,7 +828,7 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Snap a photo and MiMi will pull out what it can read, or type one value in by hand. '
+            'Snap a photo and MeMe will pull out what it can read, or type one value in by hand. '
             'Either way, you can skip this entirely and add it later from your Medical Profile.',
             style: HealthTypography.body(color: HealthColors.inkMuted),
           ),

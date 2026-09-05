@@ -10,7 +10,7 @@ from app.media.storage import presign_download
 def get_chat_history(user_id: str, limit: int) -> dict:
     """Reconstructs the chat thread from persisted rows, oldest first (how
     the thread renders on screen), plus a "welcome back" greeting when the
-    user's been away long enough that MiMi should say something about it.
+    user's been away long enough that MeMe should say something about it.
     """
     rows = (
         ChatMessage.query.filter_by(user_id=user_id)

@@ -119,7 +119,7 @@ class _MyCaregiversTab extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const MimiMascot(state: MascotState.idle, size: 96),
+                    const MemeMascot(state: MascotState.idle, size: 96),
                     const SizedBox(height: HealthSpacing.md),
                     Text('No one has access yet — invite a caregiver with +.',
                         style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),

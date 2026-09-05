@@ -34,7 +34,7 @@ class ChatController extends StateNotifier<ChatState> {
   final MediaRepository _mediaRepo;
 
   /// Restores the thread on launch so closing and reopening the app doesn't
-  /// wipe it — plus MiMi's "we missed you" nudge when the thread's been
+  /// wipe it — plus MeMe's "we missed you" nudge when the thread's been
   /// quiet long enough, tacked on as the newest bubble.
   Future<void> _loadHistory() async {
     try {

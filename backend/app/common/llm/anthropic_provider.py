@@ -67,7 +67,7 @@ class AnthropicProvider(LLMProvider):
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=400,
-                system="You are MiMi, a warm, non-clinical health journal companion. Write 2-4 short "
+                system="You are MeMe, a warm, non-clinical health journal companion. Write 2-4 short "
                 "sentences, plain prose, no markdown, no diagnosis language, first person plural avoided.",
                 messages=[{"role": "user", "content": prompt}],
             )

@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/health_colors.dart';
-import 'mimi_painter.dart';
+import 'meme_painter.dart';
 import 'mascot_state.dart';
 
-/// MiMi, the app's baby-elephant mascot, as a reusable animated widget.
+/// MeMe, the app's baby-elephant mascot, as a reusable animated widget.
 /// Every appearance reinforces one idea: memory, gentleness, trust (dev-prompt
 /// §1) — so animation is tied to *meaning* (dev-prompt §3), not decoration:
 /// idle/thinking loop while the extraction pipeline runs, celebrating plays
 /// once on a goal milestone, alerting is deliberately firmer-feeling than the
 /// others (a safety signal), remembering plays before a recall answer renders.
-class MimiMascot extends StatefulWidget {
-  const MimiMascot({super.key, required this.state, this.size = 96});
+class MemeMascot extends StatefulWidget {
+  const MemeMascot({super.key, required this.state, this.size = 96});
 
   final MascotState state;
   final double size;
 
   @override
-  State<MimiMascot> createState() => _MimiMascotState();
+  State<MemeMascot> createState() => _MemeMascotState();
 }
 
-class _MimiMascotState extends State<MimiMascot> with SingleTickerProviderStateMixin {
+class _MemeMascotState extends State<MemeMascot> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   static const _durations = {
@@ -51,7 +51,7 @@ class _MimiMascotState extends State<MimiMascot> with SingleTickerProviderStateM
   }
 
   @override
-  void didUpdateWidget(covariant MimiMascot oldWidget) {
+  void didUpdateWidget(covariant MemeMascot oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state != widget.state) {
       _controller.duration = _durations[widget.state];
@@ -90,7 +90,7 @@ class _MimiMascotState extends State<MimiMascot> with SingleTickerProviderStateM
           width: widget.size,
           height: widget.size,
           child: CustomPaint(
-            painter: MimiPainter(
+            painter: MemePainter(
               earAngle: params.earAngle,
               trunkCurl: params.trunkCurl,
               bodyBounce: params.bodyBounce,

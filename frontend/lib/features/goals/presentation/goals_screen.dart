@@ -121,7 +121,7 @@ class _GoalsBody extends ConsumerWidget {
                 ],
               ),
             ),
-            const MimiMascot(state: MascotState.celebrating, size: 46),
+            const MemeMascot(state: MascotState.celebrating, size: 46),
           ],
         ),
         const SizedBox(height: HealthSpacing.md),
@@ -138,9 +138,9 @@ class _GoalsBody extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const MimiMascot(state: MascotState.idle, size: 96),
+                  const MemeMascot(state: MascotState.idle, size: 96),
                   const SizedBox(height: HealthSpacing.md),
-                  Text('No goals yet — tap + to set one with MiMi.',
+                  Text('No goals yet — tap + to set one with MeMe.',
                       style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
                 ],
               ),
@@ -214,7 +214,7 @@ class _StreakCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'This counts days you told MiMi something — not days you hit a number. Miss one and nothing resets to zero.',
+            'This counts days you told MeMe something — not days you hit a number. Miss one and nothing resets to zero.',
             style: HealthTypography.body(fontSize: 12.5, color: HealthColors.accentTertiary),
           ),
         ],
@@ -314,7 +314,7 @@ class _GoalCardState extends ConsumerState<_GoalCard> {
         children: [
           Row(
             children: [
-              MimiMascot(state: _celebrating ? MascotState.celebrating : MascotState.idle, size: 32),
+              MemeMascot(state: _celebrating ? MascotState.celebrating : MascotState.idle, size: 32),
               const SizedBox(width: 8),
               Expanded(child: Text(_goalTypeLabels[goal.type] ?? goal.type, style: HealthTypography.body(fontSize: 14.5, weight: FontWeight.w500))),
               if (goal.status == 'active')

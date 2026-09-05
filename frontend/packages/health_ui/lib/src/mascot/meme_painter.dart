@@ -5,9 +5,9 @@ import '../tokens/health_colors.dart';
 
 /// A simple, stylized baby-elephant silhouette. Intentionally a placeholder
 /// painter (not final character art) — swap for illustrated/Lottie frames
-/// later without changing MimiMascot's animation-state contract.
-class MimiPainter extends CustomPainter {
-  MimiPainter({
+/// later without changing MemeMascot's animation-state contract.
+class MemePainter extends CustomPainter {
+  MemePainter({
     required this.earAngle,
     required this.trunkCurl,
     required this.bodyBounce,
@@ -91,7 +91,7 @@ class MimiPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant MimiPainter oldDelegate) {
+  bool shouldRepaint(covariant MemePainter oldDelegate) {
     return oldDelegate.earAngle != earAngle ||
         oldDelegate.trunkCurl != trunkCurl ||
         oldDelegate.bodyBounce != bodyBounce ||

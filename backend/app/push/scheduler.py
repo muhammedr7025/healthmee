@@ -44,7 +44,7 @@ def _maybe_send_quiet_nudge(user_id: str, today: date) -> None:
     service.send(
         user_id=user_id,
         kind="quiet_nudge",
-        title="MiMi",
+        title="MeMe",
         body="Haven't heard from you today — even a quick line keeps the picture accurate.",
         dedupe_key=f"quiet_nudge:{today.isoformat()}",
     )
@@ -58,7 +58,7 @@ def _maybe_send_streak_milestone(user_id: str, today: date) -> None:
     service.send(
         user_id=user_id,
         kind="streak_milestone",
-        title="MiMi",
+        title="MeMe",
         body=f"{streak} days logging in a row — nice consistency.",
         dedupe_key=f"streak_milestone:{streak}",
     )

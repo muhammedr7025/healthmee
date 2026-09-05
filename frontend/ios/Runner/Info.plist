@@ -17,7 +17,7 @@
 	<key>CFBundleName</key>
 	<string>Health MEE</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Health MEE uses your camera so MiMi can log a photo of your food or a lab report.</string>
+	<string>Health MEE uses your camera so MeMe can log a photo of your food or a lab report.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Health MEE needs access to your photos so you can log an existing picture of your food or a lab report.</string>
 	<key>CFBundlePackageType</key>

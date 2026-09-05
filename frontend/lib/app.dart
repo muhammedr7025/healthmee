@@ -34,7 +34,7 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: MimiMascot(state: MascotState.idle, size: 120)),
+      body: Center(child: MemeMascot(state: MascotState.idle, size: 120)),
     );
   }
 }
