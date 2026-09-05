@@ -205,7 +205,7 @@ class _TodayGrid extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: HealthSpacing.sm,
       crossAxisSpacing: HealthSpacing.sm,
-      childAspectRatio: 1.85,
+      childAspectRatio: 1.7,
       children: tiles
           .map((t) => Container(
                 padding: const EdgeInsets.all(14),
