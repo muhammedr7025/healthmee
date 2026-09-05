@@ -66,9 +66,10 @@ def delete_account(user_id: str) -> None:
 
     # DailyAggregate lives in app.analytics — imported lazily to avoid a
     # circular import (analytics doesn't otherwise depend on accounts).
-    from app.analytics.models import DailyAggregate
+    from app.analytics.models import DailyAggregate, NarrativeCache
 
     DailyAggregate.query.filter_by(user_id=user_id).delete()
+    NarrativeCache.query.filter_by(user_id=user_id).delete()
 
     User.query.filter_by(id=user_id).delete()
     db.session.commit()

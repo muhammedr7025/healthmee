@@ -20,12 +20,21 @@ fields you're unsure about rather than guessing wildly.
 def build_system_prompt(type_catalog: list[dict]) -> str:
     lines = []
     for t in type_catalog:
-        fields = ", ".join(
-            f"{name}{'*' if spec.get('required') else ''}: {spec['type']}"
-            for name, spec in t["schema"].items()
-        )
+        fields = ", ".join(_describe_field(name, spec) for name, spec in t["schema"].items())
         lines.append(f"- {t['name']}: {t['description']} (fields — {fields})")
     return SYSTEM_PROMPT_TEMPLATE.format(type_descriptions="\n".join(lines))
+
+
+def _describe_field(name: str, spec: dict) -> str:
+    """Spells out allowed values for enum fields. Without them the model
+    returns sensible-but-invalid labels ("very poor" for sleep quality,
+    "anxious" for mood), validation rejects the entry, and the user's log is
+    silently dropped.
+    """
+    described = f"{name}{'*' if spec.get('required') else ''}: {spec['type']}"
+    if spec.get("enum"):
+        described += " — must be exactly one of: " + ", ".join(spec["enum"])
+    return described
 
 
 def build_tool_schema(type_catalog: list[dict]) -> dict:

@@ -1,8 +1,11 @@
 """Tolerant JSON parsing for LLM responses.
 
 Models routinely wrap JSON in ```json fences or prepend a sentence, even when
-told not to. Rather than let that turn into a 500 on a user's chat message,
-pull the outermost JSON value out of whatever came back.
+told not to, and occasionally emit a trailing comma. None of that should turn
+into a 500 (or a silently dropped log entry) — pull the outermost JSON value
+out of whatever came back and tidy the one syntax error that's common enough
+to bother with. Anything else raises, and the caller (the extraction
+pipeline) falls back to the offline extractor rather than losing the entry.
 """
 
 import json
@@ -10,6 +13,7 @@ import re
 
 _FENCE_START = re.compile(r"^\s*```(?:json)?\s*", re.IGNORECASE)
 _FENCE_END = re.compile(r"\s*```\s*$")
+_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 
 
 def parse_json_loose(text: str):
@@ -25,4 +29,9 @@ def parse_json_loose(text: str):
     if end != -1:
         cleaned = cleaned[: end + 1]
 
-    return json.loads(cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # A trailing comma before a closing bracket is the one malformation
+        # common enough across providers to fix rather than fail on.
+        return json.loads(_TRAILING_COMMA.sub(r"\1", cleaned))

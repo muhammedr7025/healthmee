@@ -1,10 +1,36 @@
+from flask import current_app
+
 from app.accounts.models import User
 from app.common.llm import get_llm_provider
+from app.common.llm.mock_provider import MockProvider
 from app.extensions import db
 from app.logging.models import LogEntry
-from app.logging.registry import get_type, get_type_catalog, validate_payload
+from app.logging.registry import get_type, get_type_catalog, sanitize_payload, validate_payload
 from app.media.models import MediaAsset
 from app.media.storage import download_bytes
+
+
+def _extract_with_fallback(text: str, image_bytes: bytes | None, image_mime_type: str | None):
+    """Run the configured provider, falling back to the offline keyword
+    extractor if it errors.
+
+    The free Gemini tier allows only 15 requests/minute and 500/day, so
+    hitting a limit mid-day is a realistic Tuesday — and losing what someone
+    just told us because of that would be the worst possible failure. A
+    degraded entry beats no entry.
+    """
+    provider = get_llm_provider()
+    try:
+        return provider.extract(
+            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type
+        )
+    except Exception:
+        current_app.logger.exception("LLM extraction failed; falling back to the offline extractor")
+        if isinstance(provider, MockProvider):
+            raise  # nothing left to fall back to
+        return MockProvider().extract(
+            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type
+        )
 
 
 def process_message(user: User, text: str, media_asset_id: str | None = None) -> dict:
@@ -28,8 +54,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
             except Exception:
                 image_bytes = None  # object storage hiccup — degrade to text-only rather than failing the message
 
-    provider = get_llm_provider()
-    result = provider.extract(text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type)
+    result = _extract_with_fallback(text, image_bytes, image_mime_type)
 
     created_entries: list[LogEntry] = []
     all_alerts = []
@@ -37,7 +62,14 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
     touched_dates = set()
 
     for extracted in result.entries:
-        errors = validate_payload(extracted.type, extracted.payload)
+        # A model routinely gets one optional field wrong in a way that
+        # still reads as reasonable ("very poor" for sleep quality, "anxious"
+        # for mood) — sanitize drops just that field rather than losing the
+        # whole entry over it. Required-field problems still fail below.
+        payload, dropped_fields = sanitize_payload(extracted.type, extracted.payload)
+        validation_errors.extend(dropped_fields)
+
+        errors = validate_payload(extracted.type, payload)
         if errors:
             validation_errors.extend(errors)
             continue
@@ -45,7 +77,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         log_entry = LogEntry(
             user_id=user.id,
             type=extracted.type,
-            structured_payload=extracted.payload,
+            structured_payload=payload,
             raw_text=text,
             summary=extracted.summary,
             media_asset_id=media_asset_id,

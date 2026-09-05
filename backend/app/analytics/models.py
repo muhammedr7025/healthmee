@@ -2,6 +2,23 @@ from app.common.models import TimestampMixin, gen_uuid
 from app.extensions import db
 
 
+class NarrativeCache(db.Model, TimestampMixin):
+    """One row per user per period holding the last generated Trends summary
+    and a fingerprint of the stats it was written from. Regenerated only when
+    the numbers actually change — the free Gemini tier is 500 requests/day,
+    and tab-switching would otherwise spend it re-writing identical prose.
+    """
+
+    __tablename__ = "narrative_cache"
+    __table_args__ = (db.UniqueConstraint("user_id", "period", name="uq_narrative_cache_user_period"),)
+
+    id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
+    period = db.Column(db.String(20), nullable=False)
+    stats_fingerprint = db.Column(db.String(64), nullable=False)
+    summary = db.Column(db.Text, nullable=False)
+
+
 class DailyAggregate(db.Model, TimestampMixin):
     __tablename__ = "daily_aggregates"
     __table_args__ = (db.UniqueConstraint("user_id", "date", name="uq_daily_aggregate_user_date"),)

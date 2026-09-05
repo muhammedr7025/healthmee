@@ -3,10 +3,13 @@ turned into prose via the pluggable LLM provider's narrate() (deterministic
 fallback in mock mode, exactly like extraction).
 """
 
+import hashlib
+import json
 from datetime import date, timedelta
 
-from app.analytics.models import DailyAggregate
+from app.analytics.models import DailyAggregate, NarrativeCache
 from app.common.llm import get_llm_provider
+from app.extensions import db
 
 PERIODS = {
     "today": 1,
@@ -33,9 +36,7 @@ def build_period_narrative(user_id: str, period: str, custom_start: date | None,
     )
 
     stats = _compute_stats(days, start, end)
-    prompt = _build_prompt(stats)
-    provider = get_llm_provider()
-    summary = provider.narrate(prompt, stats)
+    summary = _narrate_cached(user_id, period, stats)
 
     return {
         "period": period,
@@ -46,6 +47,34 @@ def build_period_narrative(user_id: str, period: str, custom_start: date | None,
         "wins": _wins(stats),
         "watch": _watch(stats),
     }
+
+
+def _narrate_cached(user_id: str, period: str, stats: dict) -> str:
+    """Reuse a previous summary while the underlying numbers are unchanged.
+
+    Opening the Trends tab refetches this, and on the free Gemini tier
+    (500 requests/day) regenerating identical prose every time someone taps
+    between tabs would burn the daily quota for nothing. Keying the cache on
+    a hash of the stats means it refreshes exactly when there's something new
+    to say, with no staleness window to tune.
+    """
+    fingerprint = hashlib.sha256(
+        json.dumps({"period": period, **stats}, sort_keys=True, default=str).encode()
+    ).hexdigest()
+
+    cached = NarrativeCache.query.filter_by(user_id=user_id, period=period).first()
+    if cached is not None and cached.stats_fingerprint == fingerprint:
+        return cached.summary
+
+    summary = get_llm_provider().narrate(_build_prompt(stats), stats)
+
+    if cached is None:
+        cached = NarrativeCache(user_id=user_id, period=period)
+        db.session.add(cached)
+    cached.stats_fingerprint = fingerprint
+    cached.summary = summary
+    db.session.commit()
+    return summary
 
 
 def _compute_stats(days: list[DailyAggregate], start: date, end: date) -> dict:

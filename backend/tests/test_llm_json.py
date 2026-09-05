@@ -22,6 +22,11 @@ def test_parses_arrays_however_the_model_wraps_them(raw):
     assert parse_json_loose(raw) == [{"test_name": "HbA1c", "value": "5.4", "unit": "%"}]
 
 
+def test_tolerates_a_trailing_comma():
+    raw = '{"entries": [{"test_name": "HbA1c", "value": "5.4",},], "reply": "ok",}'
+    assert parse_json_loose(raw) == {"entries": [{"test_name": "HbA1c", "value": "5.4"}], "reply": "ok"}
+
+
 def test_parses_fenced_object():
     raw = '```json\n{"entries": [], "reply": "Got it."}\n```'
     assert parse_json_loose(raw) == {"entries": [], "reply": "Got it."}
@@ -88,12 +93,72 @@ def test_gemini_extraction_survives_a_fenced_reply():
     assert result.reply == "Logged."
 
 
-def test_gemini_extraction_degrades_instead_of_raising():
-    """A provider hiccup shouldn't 500 the user's chat message."""
-    _FakeGenai.next_reply = "the model said something unparseable"
-    provider = _gemini_with_fake_genai()
+class _FakeModelSequence:
+    """Like _FakeModel, but returns a different reply on each successive call
+    — for testing the one-retry-on-malformed-JSON behavior, which a fixed
+    reply can't exercise (both attempts would fail or both would succeed)."""
+
+    def __init__(self, name, system_instruction=None, generation_config=None):
+        _FakeGenaiSequence.last_generation_config = generation_config
+
+    def generate_content(self, content):
+        reply = _FakeGenaiSequence.replies[_FakeGenaiSequence.calls]
+        _FakeGenaiSequence.calls += 1
+        return _FakeResponse(reply)
+
+
+class _FakeGenaiSequence:
+    replies: list[str] = []
+    calls = 0
+    last_generation_config = None
+    GenerativeModel = _FakeModelSequence
+
+
+def _gemini_with_fake_sequence(replies):
+    from app.common.llm.gemini_provider import GeminiProvider
+
+    _FakeGenaiSequence.replies = replies
+    _FakeGenaiSequence.calls = 0
+    provider = object.__new__(GeminiProvider)
+    provider._genai = _FakeGenaiSequence
+    provider._model_name = "gemini-test"
+    return provider
+
+
+def test_gemini_extraction_retries_once_on_malformed_json_then_succeeds():
+    provider = _gemini_with_fake_sequence([
+        '{"entries": [{"type": "food",}',  # malformed — missing closing braces
+        '{"entries": [{"type": "food", "payload": {"food_items": ["dal"]}, "summary": "dal"}], "reply": "Logged."}',
+    ])
 
     result = provider.extract("had dal", [{"name": "food", "description": "d", "schema": {}}])
 
-    assert result.entries == []
-    assert result.reply  # still says something back
+    assert _FakeGenaiSequence.calls == 2
+    assert len(result.entries) == 1
+    assert result.reply == "Logged."
+
+
+def test_gemini_extraction_gives_up_after_two_malformed_replies():
+    provider = _gemini_with_fake_sequence([
+        "not json at all",
+        "still not json",
+    ])
+
+    with pytest.raises(Exception):
+        provider.extract("had dal", [{"name": "food", "description": "d", "schema": {}}])
+
+    assert _FakeGenaiSequence.calls == 2  # exactly one retry, not an unbounded loop
+
+
+def test_gemini_extraction_raises_so_the_pipeline_can_fall_back():
+    """Errors deliberately propagate rather than being swallowed here: the
+    pipeline catches them and re-runs the offline extractor, so a rate-limited
+    message still gets logged. Swallowing it here would return zero entries and
+    quietly lose what the user just said. See test_llm_resilience.py."""
+    import pytest as _pytest
+
+    _FakeGenai.next_reply = "the model said something unparseable"
+    provider = _gemini_with_fake_genai()
+
+    with _pytest.raises(Exception):
+        provider.extract("had dal", [{"name": "food", "description": "d", "schema": {}}])
