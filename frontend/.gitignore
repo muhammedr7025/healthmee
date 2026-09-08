@@ -50,3 +50,4 @@ app.*.map.json
 /android/key.properties
 /android/app/*.jks
 /android/app/*.keystore
+/android/app/KEYSTORE_README.txt
