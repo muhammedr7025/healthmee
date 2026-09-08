@@ -1,4 +1,4 @@
-package com.exatech.health
+package com.healthmee.healthmee
 
 import io.flutter.embedding.android.FlutterActivity
 
