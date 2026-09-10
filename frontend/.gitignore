@@ -51,3 +51,4 @@ app.*.map.json
 /android/app/*.jks
 /android/app/*.keystore
 /android/app/KEYSTORE_README.txt
+/android/app/upload-cert.pem
