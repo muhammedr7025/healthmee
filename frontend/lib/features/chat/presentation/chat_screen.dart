@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/app_navigation.dart';
 import '../../goals/presentation/goals_screen.dart';
+import '../../logbook/domain/log_entry.dart';
+import '../../logbook/presentation/edit_entry_sheet.dart';
 import '../../today/domain/streak.dart';
 import '../../trends/data/trends_repository.dart';
 import '../domain/chat_thread_item.dart';
@@ -24,12 +27,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
 
+  // Set when a quick-log chip filled the box, so the send is attributed to it.
+  bool _draftFromQuickLog = false;
+
   void _send([String? text]) {
     final message = (text ?? _textController.text).trim();
     if (message.isEmpty) return;
     HapticFeedback.lightImpact();
+    final source = text != null ? 'quick_reply' : (_draftFromQuickLog ? 'quick_log' : 'typed');
+    _draftFromQuickLog = false;
     _textController.clear();
-    ref.read(chatControllerProvider.notifier).sendMessage(message);
+    ref.read(chatControllerProvider.notifier).sendMessage(message, source: source);
     _scrollToNewest();
   }
 
@@ -62,6 +70,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _takeDraft(String? draft) {
     if (draft == null) return;
     ref.read(pendingChatDraftProvider.notifier).state = null;
+    _draftFromQuickLog = true;
     _textController.text = draft;
     final gap = draft.indexOf('  ');
     _textController.selection = TextSelection.collapsed(offset: gap >= 0 ? gap + 1 : draft.length);
@@ -382,20 +391,34 @@ class _ThreadItemView extends ConsumerWidget {
             const SizedBox(width: 32, child: Center(child: MemeMascot(state: MascotState.happy, size: 30))),
             const SizedBox(width: HealthSpacing.sm),
             Flexible(
-              child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.68),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                decoration: BoxDecoration(
-                  color: HealthColors.surface,
-                  border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.68),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: HealthColors.surface,
+                      border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(6),
+                      ),
+                    ),
+                    child: Text(item.text ?? '', style: HealthTypography.body(fontSize: 14.5)),
                   ),
-                ),
-                child: Text(item.text ?? '', style: HealthTypography.body(fontSize: 14.5)),
+                  // Quiet thumbs under every reply: the cheapest signal of
+                  // whether MeMe's tone and substance land.
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6, top: 2),
+                    child: _RatingButtons(
+                      onRate: (up) => ref.read(analyticsProvider).track('reply_rated', {'kind': 'reply', 'rating': up ? 'up' : 'down'}),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -452,6 +475,47 @@ class _ThreadItemView extends ConsumerWidget {
       case ChatItemKind.extractCard:
         return _ExtractCard(item: item);
     }
+  }
+}
+
+/// 👍 / 👎, faint until tapped; the choice sticks for the life of the bubble.
+class _RatingButtons extends StatefulWidget {
+  const _RatingButtons({required this.onRate});
+  final void Function(bool up) onRate;
+
+  @override
+  State<_RatingButtons> createState() => _RatingButtonsState();
+}
+
+class _RatingButtonsState extends State<_RatingButtons> {
+  bool? _rated;
+
+  Widget _button(bool up) {
+    final active = _rated == up;
+    final dimmed = _rated != null && !active;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: _rated != null
+          ? null
+          : () {
+              HapticFeedback.selectionClick();
+              setState(() => _rated = up);
+              widget.onRate(up);
+            },
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Icon(
+          up ? (active ? Icons.thumb_up : Icons.thumb_up_outlined) : (active ? Icons.thumb_down : Icons.thumb_down_outlined),
+          size: 14,
+          color: active ? HealthColors.accentPrimaryDark : (dimmed ? HealthColors.divider : HealthColors.inkFaint),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [_button(true), _button(false)]);
   }
 }
 
@@ -512,22 +576,20 @@ class _ExtractCard extends ConsumerWidget {
   const _ExtractCard({required this.item});
   final ChatThreadItem item;
 
-  Future<void> _editDialog(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController(text: item.rows.map((r) => '${r.key} ${r.value}').join(' · '));
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit entry'),
-        content: TextField(controller: controller, maxLines: 3, autofocus: true),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
-        ],
-      ),
+  /// Field-by-field correction from the type catalog — numbers stay numbers,
+  /// enums stay choices — then the card redraws from the saved payload.
+  Future<void> _editDialog(BuildContext context, WidgetRef ref, {String source = 'chat_card'}) async {
+    if (item.entryId == null) return;
+    HapticFeedback.lightImpact();
+    final entry = LogEntryView(
+      id: item.entryId!,
+      type: item.logType ?? '',
+      timestamp: DateTime.now(),
+      payload: item.payload,
+      summary: null,
     );
-    if (saved == true && item.entryId != null) {
-      await ref.read(chatControllerProvider.notifier).editEntry(item.entryId!, controller.text.trim());
-    }
+    final updated = await showEditEntrySheet(context, ref, entry, source: source);
+    if (updated != null) ref.read(chatControllerProvider.notifier).applyEntryUpdate(updated);
   }
 
   @override
@@ -560,6 +622,23 @@ class _ExtractCard extends ConsumerWidget {
                       ],
                     ),
                   ),
+                if (item.degraded)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.wifi_tethering_off, size: 13, color: HealthColors.accentPrimaryDark),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            "MeMe's offline brain logged this — worth a quick check.",
+                            style: HealthTypography.body(fontSize: 11.5, color: HealthColors.accentPrimaryDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 // The entry is already saved by the time this card renders,
                 // so there's nothing to confirm — just say so, and offer Edit.
                 Padding(
@@ -570,6 +649,13 @@ class _ExtractCard extends ConsumerWidget {
                       const SizedBox(width: 6),
                       Text('Saved to today', style: HealthTypography.body(fontSize: 12, color: HealthColors.accentSecondary)),
                       const Spacer(),
+                      _RatingButtons(
+                        onRate: (up) {
+                          ref.read(analyticsProvider).track('reply_rated', {'kind': 'card', 'rating': up ? 'up' : 'down', 'log_type': item.logType});
+                          if (!up) _editDialog(context, ref, source: 'thumbs_down');
+                        },
+                      ),
+                      const SizedBox(width: 4),
                       InkWell(
                         borderRadius: BorderRadius.circular(8),
                         onTap: () => _editDialog(context, ref),

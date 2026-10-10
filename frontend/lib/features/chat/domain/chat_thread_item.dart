@@ -22,6 +22,8 @@ class ChatThreadItem {
     this.photoUrl,
     this.status = SendStatus.sent,
     this.clientId,
+    this.payload = const {},
+    this.degraded = false,
   });
 
   factory ChatThreadItem.userText(String text, {SendStatus status = SendStatus.sent, String? clientId}) =>
@@ -61,7 +63,9 @@ class ChatThreadItem {
     required String logType,
     required String summary,
     required List<MapEntry<String, String>> rows,
+    Map<String, dynamic> payload = const {},
     bool confirmed = false,
+    bool degraded = false,
   }) =>
       ChatThreadItem._(
         kind: ChatItemKind.extractCard,
@@ -69,7 +73,9 @@ class ChatThreadItem {
         logType: logType,
         summary: summary,
         rows: rows,
+        payload: payload,
         confirmed: confirmed,
+        degraded: degraded,
       );
 
   factory ChatThreadItem.alert({required String message, required bool hard}) =>
@@ -91,18 +97,35 @@ class ChatThreadItem {
   /// (pending → sent/failed) and retried.
   final String? clientId;
 
-  ChatThreadItem copyWith({String? summary, bool? confirmed, SendStatus? status}) => ChatThreadItem._(
+  /// The raw structured payload behind an extraction card — what the typed
+  /// correction sheet edits.
+  final Map<String, dynamic> payload;
+
+  /// This card came from the offline extractor because the model failed.
+  final bool degraded;
+
+  ChatThreadItem copyWith({
+    String? summary,
+    bool? confirmed,
+    SendStatus? status,
+    List<MapEntry<String, String>>? rows,
+    Map<String, dynamic>? payload,
+    bool? degraded,
+  }) =>
+      ChatThreadItem._(
         kind: kind,
         text: text,
         logType: logType,
         summary: summary ?? this.summary,
         alertHard: alertHard,
         entryId: entryId,
-        rows: rows,
+        rows: rows ?? this.rows,
         confirmed: confirmed ?? this.confirmed,
         photoBytes: photoBytes,
         photoUrl: photoUrl,
         status: status ?? this.status,
         clientId: clientId,
+        payload: payload ?? this.payload,
+        degraded: degraded ?? this.degraded,
       );
 }

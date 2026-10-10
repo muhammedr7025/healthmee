@@ -8,6 +8,7 @@ import 'package:health_ui/health_ui.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../media/data/media_repository.dart';
 import '../data/medical_profile_repository.dart';
 import '../domain/medical_profile.dart';
@@ -55,6 +56,8 @@ Future<List<LabResultData>?> runLabScanFlow(BuildContext context, WidgetRef ref)
     ),
   );
   if (source == null) return null;
+  final analytics = ref.read(analyticsProvider);
+  analytics.track('lab_scan_started', {'source': source.name});
 
   final String mediaAssetId;
   if (source == _Source.pdf) {
@@ -88,7 +91,10 @@ Future<List<LabResultData>?> runLabScanFlow(BuildContext context, WidgetRef ref)
 
   final repo = ref.read(medicalProfileRepositoryProvider);
   final scan = await repo.scanLabReport(mediaAssetId);
-  if (scan.candidates.isEmpty) return const [];
+  if (scan.candidates.isEmpty) {
+    analytics.track('lab_scan_reviewed', {'source': source.name, 'candidates': 0, 'kept': 0, 'outcome': 'nothing_read'});
+    return const [];
+  }
   if (!context.mounted) return null;
 
   final reviewed = await showModalBottomSheet<_ReviewOutcome>(
@@ -98,6 +104,13 @@ Future<List<LabResultData>?> runLabScanFlow(BuildContext context, WidgetRef ref)
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (_) => _LabReviewSheet(scan: scan),
   );
+  analytics.track('lab_scan_reviewed', {
+    'source': source.name,
+    'candidates': scan.candidates.length,
+    'kept': reviewed?.kept.length ?? 0,
+    'outcome': reviewed == null ? 'cancelled' : 'saved',
+    'date_from_report': scan.reportDate != null,
+  });
   if (reviewed == null) return null;
 
   final saved = await repo.saveLabResults(reviewed.kept, takenAt: reviewed.takenAt, mediaAssetId: scan.mediaAssetId);

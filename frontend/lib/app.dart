@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
+import 'core/analytics/analytics.dart';
 import 'core/app_shell.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/auth_gate.dart';
@@ -28,6 +29,7 @@ class HealthApp extends ConsumerWidget {
       title: 'Health MEE',
       debugShowCheckedModeBanner: false,
       theme: HealthTheme.light(),
+      navigatorObservers: [AnalyticsRouteObserver(ref.watch(analyticsProvider))],
       home: switch (auth.status) {
         AuthStatus.checking => const _SplashScreen(),
         AuthStatus.unauthenticated => const AuthGate(),

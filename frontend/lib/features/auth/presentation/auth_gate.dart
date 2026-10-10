@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../data/auth_repository.dart';
 import 'auth_controller.dart';
 import 'login_screen.dart';
@@ -26,6 +28,21 @@ class _AuthGateState extends ConsumerState<AuthGate> {
 
   void _go(_AuthScreen screen) => setState(() => _screen = screen);
 
+  /// Runs an auth action and records how it failed (status code / error
+  /// type only) before letting the screen show its message. The screens
+  /// stay plain widgets; attribution lives here.
+  Future<void> _tracked(String event, Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      ref.read(analyticsProvider).track(event, {
+        'status': e is DioException ? e.response?.statusCode : null,
+        'type': e is DioException ? e.type.name : e.runtimeType.toString(),
+      });
+      rethrow;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authController = ref.read(authControllerProvider.notifier);
@@ -39,12 +56,13 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         );
       case _AuthScreen.signup:
         return SignupScreen(
-          onCreateAccount: (email, password) => authController.register(email: email, password: password),
+          onCreateAccount: (email, password) =>
+              _tracked('signup_error', () => authController.register(email: email, password: password)),
           onSignIn: () => _go(_AuthScreen.login),
         );
       case _AuthScreen.login:
         return LoginScreen(
-          onSignIn: (email, password) => authController.login(email: email, password: password),
+          onSignIn: (email, password) => _tracked('login_error', () => authController.login(email: email, password: password)),
           onForgotPassword: () => _go(_AuthScreen.reset),
           onSignUp: () => _go(_AuthScreen.signup),
         );

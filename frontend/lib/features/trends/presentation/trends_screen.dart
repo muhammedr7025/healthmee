@@ -1,9 +1,11 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/app_navigation.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../today/domain/daily_aggregate.dart';
@@ -45,6 +47,13 @@ final _trendsViewProvider = StateProvider.autoDispose<String>((ref) => 'read'); 
 
 class TrendsScreen extends ConsumerWidget {
   const TrendsScreen({super.key});
+
+  void _switchView(WidgetRef ref, String view) {
+    if (ref.read(_trendsViewProvider) == view) return;
+    HapticFeedback.selectionClick();
+    ref.read(analyticsProvider).track('trends_view', {'view': view});
+    ref.read(_trendsViewProvider.notifier).state = view;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -96,14 +105,14 @@ class TrendsScreen extends ConsumerWidget {
                               child: _ViewTab(
                                 label: 'Charts',
                                 selected: view == 'charts',
-                                onTap: () => ref.read(_trendsViewProvider.notifier).state = 'charts',
+                                onTap: () => _switchView(ref, 'charts'),
                               ),
                             ),
                             Expanded(
                               child: _ViewTab(
                                 label: 'Read',
                                 selected: view == 'read',
-                                onTap: () => ref.read(_trendsViewProvider.notifier).state = 'read',
+                                onTap: () => _switchView(ref, 'read'),
                               ),
                             ),
                           ],
@@ -188,7 +197,12 @@ class _TrendsBody extends ConsumerWidget {
                       child: _Pill(
                         label: m.label,
                         selected: m.key == selectedKey,
-                        onTap: () => ref.read(_selectedMetricProvider.notifier).state = m.key,
+                        onTap: () {
+                          if (m.key == selectedKey) return;
+                          HapticFeedback.selectionClick();
+                          ref.read(analyticsProvider).track('metric_selected', {'metric': m.key, 'has_data': recentDays.any((d) => m.get(d) != null)});
+                          ref.read(_selectedMetricProvider.notifier).state = m.key;
+                        },
                       ),
                     ))
                 .toList(),
@@ -374,7 +388,12 @@ class _ReadView extends ConsumerWidget {
                         child: _ViewTab(
                           label: p.$2,
                           selected: period == p.$1,
-                          onTap: () => ref.read(narrativePeriodProvider.notifier).state = p.$1,
+                          onTap: () {
+                            if (period == p.$1) return;
+                            HapticFeedback.selectionClick();
+                            ref.read(analyticsProvider).track('narrative_period', {'period': p.$1});
+                            ref.read(narrativePeriodProvider.notifier).state = p.$1;
+                          },
                         ),
                       ),
                     ))
@@ -554,6 +573,8 @@ class _ReadView extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
+                          HapticFeedback.lightImpact();
+                          ref.read(analyticsProvider).track('ask_meme_tapped', {'period': period, 'risks': narrative.risks.length});
                           ref.read(pendingChatMessageProvider.notifier).state =
                               'Explain my ${period == 'today' ? "today's" : "$period's"} summary';
                           ref.read(activeTabProvider.notifier).state = chatTabIndex;
@@ -563,7 +584,10 @@ class _ReadView extends ConsumerWidget {
                     ),
                     const SizedBox(width: 9),
                     OutlinedButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
+                      onPressed: () {
+                        ref.read(analyticsProvider).track('export_tapped', {'from': 'trends_read'});
+                        Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'reports'), builder: (_) => const ReportsScreen()));
+                      },
                       child: const Text('Export'),
                     ),
                   ],

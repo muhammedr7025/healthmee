@@ -7,28 +7,32 @@ import '../data/medications_repository.dart';
 
 /// "Add a medicine": name, dose, and the times of day it's due. Returns true
 /// when one was saved.
-Future<bool?> showAddMedicationSheet(BuildContext context, WidgetRef ref) {
+Future<bool?> showAddMedicationSheet(BuildContext context, WidgetRef ref, {String? initialName}) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: HealthColors.bgBase,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => _AddMedicationSheet(ref: ref),
+    builder: (_) => _AddMedicationSheet(ref: ref, initialName: initialName),
   );
 }
 
 const _presetSlots = [('Morning', '08:00'), ('Midday', '13:00'), ('Evening', '20:00')];
 
 class _AddMedicationSheet extends StatefulWidget {
-  const _AddMedicationSheet({required this.ref});
+  const _AddMedicationSheet({required this.ref, this.initialName});
   final WidgetRef ref;
+
+  /// Pre-filled when the medicine already sits on the medical profile and
+  /// only needs its times.
+  final String? initialName;
 
   @override
   State<_AddMedicationSheet> createState() => _AddMedicationSheetState();
 }
 
 class _AddMedicationSheetState extends State<_AddMedicationSheet> {
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: widget.initialName ?? '');
   final _dose = TextEditingController();
   final _times = <String>{'08:00'};
   bool _saving = false;
@@ -106,7 +110,7 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
           const SizedBox(height: HealthSpacing.md),
           TextField(
             controller: _name,
-            autofocus: true,
+            autofocus: widget.initialName == null,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.next,
             onChanged: (_) => setState(() {}), // the Add button enables as soon as there's a name

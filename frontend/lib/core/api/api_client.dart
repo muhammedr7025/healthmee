@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../analytics/analytics.dart';
 import 'api_config.dart';
 import 'auth_storage.dart';
 
@@ -43,6 +44,26 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(_SessionRefreshInterceptor(dio, storage, onExpired: () {
     ref.read(sessionExpiredProvider.notifier).state++;
   }));
+
+  // Every failed call is an event: path, status, error type, how long it
+  // took. Analytics has its own client, so this can't loop on itself.
+  dio.interceptors.add(InterceptorsWrapper(
+    onError: (err, handler) {
+      final started = err.requestOptions.extra['started_at'] as int?;
+      ref.read(analyticsProvider).track('api_error', {
+        'path': err.requestOptions.path.replaceAll(RegExp(r'[0-9a-f-]{36}'), ':id'),
+        'method': err.requestOptions.method,
+        'status': err.response?.statusCode,
+        'type': err.type.name,
+        'ms': started == null ? null : DateTime.now().millisecondsSinceEpoch - started,
+      });
+      handler.next(err);
+    },
+    onRequest: (options, handler) {
+      options.extra['started_at'] = DateTime.now().millisecondsSinceEpoch;
+      handler.next(options);
+    },
+  ));
 
   return dio;
 });

@@ -3,7 +3,9 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../logbook/domain/log_entry.dart';
 import '../../media/data/media_repository.dart';
 import '../../today/data/today_repository.dart';
 import '../../trends/data/trends_repository.dart';
@@ -34,10 +36,14 @@ class ChatState {
 }
 
 class _Outgoing {
-  _Outgoing({required this.clientId, required this.text, this.bytes});
+  _Outgoing({required this.clientId, required this.text, this.bytes, this.source = 'typed', this.attempt = 1});
   final String clientId;
   final String text;
   final Uint8List? bytes;
+
+  /// typed | quick_reply | quick_log | nudge — where the message came from.
+  final String source;
+  final int attempt;
 }
 
 class ChatController extends StateNotifier<ChatState> {
@@ -94,11 +100,13 @@ class ChatController extends StateNotifier<ChatState> {
         final entryId = json['entry_id'] as String?;
         if (entryId == null) return null; // the entry was deleted; nothing to show
         final logType = json['log_type'] as String? ?? '';
+        final payload = Map<String, dynamic>.from(json['payload'] as Map? ?? {});
         return ChatThreadItem.extractCard(
           entryId: entryId,
           logType: logType,
           summary: extractCardLabel(logType),
-          rows: formatLogRows(logType, Map<String, dynamic>.from(json['payload'] as Map? ?? {})),
+          rows: formatLogRows(logType, payload),
+          payload: payload,
           confirmed: true,
         );
       case 'assistant_reply':
@@ -107,11 +115,11 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {String source = 'typed'}) async {
     if (text.trim().isEmpty) return;
     final clientId = 'c${++_clientSeq}';
     state = state.copyWith(items: [...state.items, ChatThreadItem.userText(text, status: SendStatus.pending, clientId: clientId)]);
-    _queue.add(_Outgoing(clientId: clientId, text: text));
+    _queue.add(_Outgoing(clientId: clientId, text: text, source: source));
     _drain();
   }
 
@@ -127,7 +135,7 @@ class ChatController extends StateNotifier<ChatState> {
         ChatThreadItem.userPhoto(bytes: bytes, caption: caption.isEmpty ? null : caption, status: SendStatus.pending, clientId: clientId),
       ],
     );
-    _queue.add(_Outgoing(clientId: clientId, text: caption, bytes: bytes));
+    _queue.add(_Outgoing(clientId: clientId, text: caption, bytes: bytes, source: 'photo'));
     _drain();
   }
 
@@ -136,9 +144,13 @@ class ChatController extends StateNotifier<ChatState> {
     final item = state.items.where((i) => i.clientId == clientId).firstOrNull;
     if (item == null || item.status != SendStatus.failed) return;
     _setStatus(clientId, SendStatus.pending);
-    _queue.add(_Outgoing(clientId: clientId, text: item.text ?? '', bytes: item.photoBytes));
+    _attempts[clientId] = (_attempts[clientId] ?? 1) + 1;
+    _ref.read(analyticsProvider).track('message_retried', {'attempt': _attempts[clientId]});
+    _queue.add(_Outgoing(clientId: clientId, text: item.text ?? '', bytes: item.photoBytes, source: 'retry', attempt: _attempts[clientId]!));
     _drain();
   }
+
+  final _attempts = <String, int>{};
 
   Future<void> _drain() async {
     if (_draining) return;
@@ -156,10 +168,13 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> _deliver(_Outgoing outgoing) async {
+    final analytics = _ref.read(analyticsProvider);
+    final started = DateTime.now();
     try {
       String? mediaAssetId;
       if (outgoing.bytes != null) {
         mediaAssetId = await _mediaRepo.uploadPhoto(outgoing.bytes!);
+        analytics.track('photo_logged', {'bytes': outgoing.bytes!.length, 'upload_ms': DateTime.now().difference(started).inMilliseconds});
       }
       final result = await _repo.sendMessage(outgoing.text, mediaAssetId: mediaAssetId);
       final newItems = <ChatThreadItem>[
@@ -169,6 +184,8 @@ class ChatController extends StateNotifier<ChatState> {
             logType: entry['type'] as String,
             summary: extractCardLabel(entry['type'] as String),
             rows: formatLogRows(entry['type'] as String, Map<String, dynamic>.from(entry['payload'] as Map? ?? {})),
+            payload: Map<String, dynamic>.from(entry['payload'] as Map? ?? {}),
+            degraded: result.degraded,
           ),
         for (final alert in result.alerts)
           ChatThreadItem.alert(message: alert['message'] as String, hard: alert['severity'] == 'hard'),
@@ -181,11 +198,22 @@ class ChatController extends StateNotifier<ChatState> {
           ...newItems,
         ],
       );
+      analytics.track('message_sent', {
+        'chars': outgoing.text.length,
+        'has_photo': outgoing.bytes != null,
+        'source': outgoing.source,
+        'attempt': outgoing.attempt,
+        'entries': result.entries.length,
+        'alerts': result.alerts.length,
+        'degraded': result.degraded,
+        'round_trip_ms': DateTime.now().difference(started).inMilliseconds,
+      });
       if (result.entries.isNotEmpty) _refreshDerivedViews();
-    } catch (_) {
+    } catch (e) {
       // The bubble says "not sent" with a retry; no MeMe apology that makes
       // it look like the conversation moved on without the message.
       _setStatus(outgoing.clientId, SendStatus.failed);
+      analytics.track('message_failed', {'reason': e.runtimeType.toString(), 'has_photo': outgoing.bytes != null, 'attempt': outgoing.attempt});
     }
   }
 
@@ -206,22 +234,30 @@ class ChatController extends StateNotifier<ChatState> {
     _ref.invalidate(trendsDataProvider);
   }
 
-  Future<void> editEntry(String entryId, String newSummaryLine) async {
-    await _repo.editEntrySummary(entryId, newSummaryLine);
+  /// After the typed correction sheet saved: redraw the card from the real
+  /// payload (not a free-text line) and refresh the totals it feeds.
+  void applyEntryUpdate(LogEntryView updated) {
     state = state.copyWith(
       items: [
         for (final item in state.items)
-          if (item.entryId == entryId)
-            ChatThreadItem.extractCard(
-              entryId: entryId,
-              logType: item.logType ?? '',
-              summary: item.summary ?? '',
-              rows: [MapEntry(newSummaryLine, '')],
-            ).copyWith(confirmed: true)
+          if (item.entryId == updated.id)
+            item.copyWith(
+              rows: formatLogRows(updated.type, updated.payload),
+              payload: updated.payload,
+              confirmed: true,
+              degraded: false, // a human has checked it now
+            )
           else
             item,
       ],
     );
+    _refreshDerivedViews();
+  }
+
+  /// A card the user removed from the detail screen.
+  void removeEntry(String entryId) {
+    state = state.copyWith(items: [for (final item in state.items) if (item.entryId != entryId) item]);
+    _refreshDerivedViews();
   }
 }
 

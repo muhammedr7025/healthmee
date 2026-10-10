@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/app_navigation.dart';
 import '../../chat/domain/log_row_formatter.dart';
 import '../../medical_profile/data/medical_profile_repository.dart';
@@ -81,8 +82,9 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
     return false;
   }
 
-  void _quickLog(String draft) {
+  void _quickLog(String label, String draft) {
     HapticFeedback.selectionClick();
+    ref.read(analyticsProvider).track('quick_log_tap', {'template': label.toLowerCase()});
     ref.read(pendingChatDraftProvider.notifier).state = draft;
     ref.read(activeTabProvider.notifier).state = chatTabIndex;
   }
@@ -113,6 +115,7 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
                           onTap: () {
                             if (tab == t.$1) return;
                             HapticFeedback.selectionClick();
+                            ref.read(analyticsProvider).track('logbook_tab', {'tab': t.$1});
                             ref.read(logbookTabProvider.notifier).state = t.$1;
                           },
                         ),
@@ -129,7 +132,7 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
                     for (final q in _quickLogs)
                       Padding(
                         padding: const EdgeInsets.only(right: 7),
-                        child: _QuickChip(label: q.$1, onTap: () => _quickLog(q.$2)),
+                        child: _QuickChip(label: q.$1, onTap: () => _quickLog(q.$1, q.$2)),
                       ),
                   ],
                 ),

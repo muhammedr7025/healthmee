@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../chat/domain/log_row_formatter.dart';
 import '../data/logbook_repository.dart';
 import '../domain/log_entry.dart';
 import '../domain/meme_comment.dart';
+import 'edit_entry_sheet.dart';
 import 'type_tag.dart';
 
 /// One entry in full: when, what MeMe pulled out of it, MeMe's take, and
@@ -24,7 +26,15 @@ class EntryDetailScreen extends ConsumerStatefulWidget {
 
 class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   late final _summary = TextEditingController(text: widget.entry.summary ?? '');
+  late LogEntryView _entry = widget.entry;
   bool _busy = false;
+  bool _changed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(analyticsProvider).track('entry_detail_opened', {'type': widget.entry.type});
+  }
 
   @override
   void dispose() {
@@ -32,10 +42,21 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _editDetails() async {
+    final updated = await showEditEntrySheet(context, ref, _entry, source: 'detail');
+    if (updated != null && mounted) {
+      setState(() {
+        _entry = updated;
+        _changed = true;
+        if (updated.summary != null) _summary.text = updated.summary!;
+      });
+    }
+  }
+
   Future<void> _save() async {
     final text = _summary.text.trim();
-    if (text == (widget.entry.summary ?? '').trim()) {
-      Navigator.pop(context, false);
+    if (text == (_entry.summary ?? '').trim()) {
+      Navigator.pop(context, _changed);
       return;
     }
     setState(() => _busy = true);
@@ -82,7 +103,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entry = widget.entry;
+    final entry = _entry;
     final rows = formatLogRows(entry.type, entry.payload);
 
     return Scaffold(
@@ -138,8 +159,18 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
               ),
             ),
             const SizedBox(height: HealthSpacing.md),
-            Text('WHAT MEME PULLED OUT', style: HealthTypography.label()),
-            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(child: Text('WHAT MEME PULLED OUT', style: HealthTypography.label())),
+                TextButton.icon(
+                  onPressed: _busy ? null : _editDetails,
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: Icon(Icons.tune, size: 15, color: HealthColors.accentPrimaryDark),
+                  label: Text('Fix the details', style: HealthTypography.body(fontSize: 12, weight: FontWeight.w500, color: HealthColors.accentPrimaryDark)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
             HealthCard(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
               child: Column(
@@ -183,7 +214,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
             const SizedBox(height: HealthSpacing.lg),
             Row(
               children: [
-                TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: const Text('Back')),
+                TextButton(onPressed: _busy ? null : () => Navigator.pop(context, _changed), child: const Text('Back')),
                 const Spacer(),
                 ElevatedButton(onPressed: _busy ? null : _save, child: Text(_busy ? 'Saving…' : 'Save')),
               ],

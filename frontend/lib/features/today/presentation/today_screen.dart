@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../goals/data/goals_repository.dart';
+import '../../medical_profile/data/medical_profile_repository.dart';
 import '../../logbook/data/logbook_repository.dart';
 import '../../logbook/domain/log_entry.dart';
 import '../../logbook/presentation/entry_detail_screen.dart';
@@ -147,7 +149,7 @@ class _TodayBody extends ConsumerWidget {
   }
 }
 
-class _ScoreCard extends StatelessWidget {
+class _ScoreCard extends ConsumerWidget {
   const _ScoreCard({required this.score});
   final AsyncValue<TodayScore> score;
 
@@ -159,8 +161,9 @@ class _ScoreCard extends StatelessWidget {
     return "Tell MeMe how today's going";
   }
 
-  void _showBreakdown(BuildContext context, TodayScore s) {
+  void _showBreakdown(BuildContext context, WidgetRef ref, TodayScore s) {
     HapticFeedback.lightImpact();
+    ref.read(analyticsProvider).track('score_breakdown_opened', {'score': s.score, 'achievable': s.achievable});
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -228,7 +231,7 @@ class _ScoreCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final s = score.valueOrNull;
     final value = s?.score ?? 0;
 
@@ -236,7 +239,7 @@ class _ScoreCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(HealthSpacing.radiusMd),
-        onTap: s == null ? null : () => _showBreakdown(context, s),
+        onTap: s == null ? null : () => _showBreakdown(context, ref, s),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -452,8 +455,8 @@ class _MedicinesCard extends ConsumerWidget {
     ref.invalidate(todayScoreProvider);
   }
 
-  Future<void> _add(BuildContext context, WidgetRef ref) async {
-    final added = await showAddMedicationSheet(context, ref);
+  Future<void> _add(BuildContext context, WidgetRef ref, {String? initialName}) async {
+    final added = await showAddMedicationSheet(context, ref, initialName: initialName);
     if (added == true) {
       ref.invalidate(medicationsTodayProvider);
       ref.invalidate(todayScoreProvider);
@@ -463,6 +466,9 @@ class _MedicinesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncPlan = ref.watch(medicationsTodayProvider);
+    // Medicines typed during onboarding live on the profile as names only;
+    // offer them here so the schedule isn't an empty list on day one.
+    final profileMeds = ref.watch(medicalProfileProvider).valueOrNull?.medications ?? const <String>[];
 
     return HealthCard(
       padding: const EdgeInsets.all(16),
@@ -503,16 +509,37 @@ class _MedicinesCard extends ConsumerWidget {
             const SizedBox(height: 8),
             if (plan.total == 0) ...[
               Text(
-                'Add what you take and MeMe keeps count each day — it feeds the score too.',
+                profileMeds.isEmpty
+                    ? 'Add what you take and MeMe keeps count each day — it feeds the score too.'
+                    : 'You listed these on your profile — add the times and MeMe will keep count.',
                 style: HealthTypography.body(fontSize: 13, color: HealthColors.inkMuted),
               ),
               const SizedBox(height: 8),
+              if (profileMeds.isNotEmpty) ...[
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final name in profileMeds.take(6))
+                      _Pill(
+                        label: '$name · add times',
+                        bg: HealthColors.chipIdle,
+                        fg: HealthColors.inkPrimary,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _add(context, ref, initialName: name);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
                   onPressed: () => _add(context, ref),
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add a medicine'),
+                  label: Text(profileMeds.isEmpty ? 'Add a medicine' : 'Add another medicine'),
                 ),
               ),
             ] else ...[

@@ -25,6 +25,16 @@ class LogbookRepository {
     await _dio.patch('/log-entries/$entryId', data: {'summary': summary});
   }
 
+  /// Field-level correction. The server re-validates the payload against
+  /// the type and recomputes the day; the updated entry comes back.
+  Future<LogEntryView> updateEntry(String entryId, {Map<String, dynamic>? payload, String? summary}) async {
+    final resp = await _dio.patch('/log-entries/$entryId', data: {
+      'payload': ?payload,
+      'summary': ?summary,
+    });
+    return LogEntryView.fromJson(resp.data as Map<String, dynamic>);
+  }
+
   Future<void> deleteEntry(String entryId) async {
     await _dio.delete('/log-entries/$entryId');
   }

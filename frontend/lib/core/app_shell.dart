@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
+import 'analytics/analytics.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/logbook/data/logbook_repository.dart';
 import '../features/logbook/presentation/logbook_screen.dart';
@@ -42,9 +43,21 @@ class AppShell extends ConsumerWidget {
     }
   }
 
+  static const _tabNames = ['chat', 'today', 'trends', 'logbook', 'settings'];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(activeTabProvider);
+
+    // Every tab change — tapped or programmatic (Trends → "Ask MeMe") — is a
+    // screen view.
+    ref.listen<int>(activeTabProvider, (previous, next) {
+      ref.read(analyticsProvider).track('screen_view', {
+        'screen': _tabNames[next],
+        'from': previous == null ? null : _tabNames[previous],
+        'how': 'tab',
+      });
+    });
 
     return Scaffold(
       body: IndexedStack(index: index, children: _screens),
