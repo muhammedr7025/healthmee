@@ -1,10 +1,12 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint
 
+from app.accounts.models import User
 from app.analytics.models import DailyAggregate
+from app.common.localtime import local_today, user_tz_offset
 from app.analytics.narrative import build_period_narrative
 from app.analytics.schemas import (
     DailyAggregateSchema,
@@ -22,8 +24,9 @@ class Today(MethodView):
     @jwt_required()
     @blp.response(200, DailyAggregateSchema)
     def get(self):
-        user_id = get_jwt_identity()
-        today = date.today()
+        user = User.query.get_or_404(get_jwt_identity())
+        user_id = user.id
+        today = local_today(user_tz_offset(user))
         aggregate = DailyAggregate.query.filter_by(user_id=user_id, date=today).first()
         if aggregate is None:
             return {
@@ -60,8 +63,9 @@ class Trends(MethodView):
     @blp.arguments(TrendsQuerySchema, location="query")
     @blp.response(200, TrendsResponseSchema)
     def get(self, args):
-        user_id = get_jwt_identity()
-        end = args.get("end") or date.today()
+        user = User.query.get_or_404(get_jwt_identity())
+        user_id = user.id
+        end = args.get("end") or local_today(user_tz_offset(user))
         start = args.get("start") or (end - timedelta(days=30))
 
         days = (

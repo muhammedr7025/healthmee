@@ -1,10 +1,11 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 
 from app.accounts.models import User
 from app.common.llm import get_llm_provider
 from app.common.llm.mock_provider import MockProvider
+from app.common.localtime import local_date_of, local_now, to_local, to_utc, user_tz_offset
 from app.common.models import utcnow
 from app.extensions import db
 from app.logging.models import ChatMessage, LogEntry
@@ -13,7 +14,7 @@ from app.media.models import MediaAsset
 from app.media.storage import download_bytes
 
 
-def _extract_with_fallback(text: str, image_bytes: bytes | None, image_mime_type: str | None):
+def _extract_with_fallback(text: str, image_bytes: bytes | None, image_mime_type: str | None, now_local: datetime):
     """Run the configured provider, falling back to the offline keyword
     extractor if it errors.
 
@@ -25,15 +26,42 @@ def _extract_with_fallback(text: str, image_bytes: bytes | None, image_mime_type
     provider = get_llm_provider()
     try:
         return provider.extract(
-            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type
+            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
         )
     except Exception:
         current_app.logger.exception("LLM extraction failed; falling back to the offline extractor")
         if isinstance(provider, MockProvider):
             raise  # nothing left to fall back to
         return MockProvider().extract(
-            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type
+            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
         )
+
+
+def _timestamp_for(extracted, now_local: datetime, tz_offset: int) -> datetime | None:
+    """UTC timestamp for an entry the message dated ("yesterday", "for
+    dinner"), or None to take the default (now).
+
+    A clock time that hasn't happened yet today means the previous one:
+    "had an apple at 4pm" typed at 1am is yesterday's 4pm. Anything
+    unparseable, further in the future than that, or over a year old is
+    treated as a model slip and ignored rather than filed somewhere
+    surprising."""
+    raw = getattr(extracted, "occurred_at", None)
+    if not raw:
+        return None
+    try:
+        when = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if when.tzinfo is not None:
+        when = to_local(when, tz_offset)
+    if when > now_local + timedelta(minutes=5):
+        if when - now_local >= timedelta(hours=24):
+            return None
+        when -= timedelta(days=1)
+    if when < now_local - timedelta(days=365):
+        return None
+    return to_utc(when, tz_offset)
 
 
 def process_message(user: User, text: str, media_asset_id: str | None = None) -> dict:
@@ -57,7 +85,9 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
             except Exception:
                 image_bytes = None  # object storage hiccup — degrade to text-only rather than failing the message
 
-    result = _extract_with_fallback(text, image_bytes, image_mime_type)
+    tz_offset = user_tz_offset(user)
+    now_local = local_now(tz_offset)
+    result = _extract_with_fallback(text, image_bytes, image_mime_type, now_local)
 
     created_entries: list[LogEntry] = []
     all_alerts = []
@@ -85,6 +115,9 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
             summary=extracted.summary,
             media_asset_id=media_asset_id,
         )
+        when = _timestamp_for(extracted, now_local, tz_offset)
+        if when is not None:
+            log_entry.timestamp = when
         db.session.add(log_entry)
         db.session.flush()  # assign id/timestamp defaults before handlers run
 
@@ -93,7 +126,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
             all_alerts.extend(handler(user, log_entry))
 
         created_entries.append(log_entry)
-        touched_dates.add(log_entry.timestamp.date())
+        touched_dates.add(local_date_of(log_entry.timestamp, tz_offset))
 
     db.session.flush()  # assign ids to alerts before the transcript rows reference them
     _record_chat_transcript(user, text, media_asset_id, created_entries, all_alerts, result.reply)
@@ -104,7 +137,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         from app.analytics.tasks import recompute_daily_aggregate
 
         for date in touched_dates:
-            recompute_daily_aggregate.delay(user.id, date.isoformat())
+            recompute_daily_aggregate.delay(user.id, date.isoformat(), tz_offset)
 
     return {
         "entries": [e.to_dict() for e in created_entries],

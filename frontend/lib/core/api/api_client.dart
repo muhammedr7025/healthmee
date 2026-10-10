@@ -17,6 +17,11 @@ final dioProvider = Provider<Dio>((ref) {
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
+        // Minutes east of UTC. The backend buckets "today" and resolves
+        // "yesterday"/"for dinner" against this rather than the server's
+        // clock — without it, an IST user's post-midnight logs land on the
+        // previous day.
+        options.headers['X-Timezone-Offset'] = DateTime.now().timeZoneOffset.inMinutes.toString();
         handler.next(options);
       },
     ),

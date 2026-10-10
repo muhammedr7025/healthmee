@@ -19,9 +19,10 @@ class AnthropicProvider(LLMProvider):
         type_catalog: list[dict],
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
+        local_now=None,
     ) -> ExtractionResult:
         tool = build_tool_schema(type_catalog)
-        system = build_system_prompt(type_catalog)
+        system = build_system_prompt(type_catalog, local_now=local_now)
         content = _user_content(text or "What's in this photo? Log it.", image_bytes, image_mime_type)
 
         response = self._client.messages.create(
@@ -37,7 +38,12 @@ class AnthropicProvider(LLMProvider):
             if block.type == "tool_use" and block.name == "log_entries":
                 data = block.input
                 entries = [
-                    ExtractedEntry(type=e["type"], payload=e.get("payload", {}), summary=e.get("summary", ""))
+                    ExtractedEntry(
+                        type=e["type"],
+                        payload=e.get("payload", {}),
+                        summary=e.get("summary", ""),
+                        occurred_at=e.get("occurred_at"),
+                    )
                     for e in data.get("entries", [])
                 ]
                 return ExtractionResult(entries=entries, reply=data.get("reply", ""))

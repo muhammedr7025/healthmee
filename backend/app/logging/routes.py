@@ -87,7 +87,7 @@ class LogEntryDetail(MethodView):
         for key, value in data.items():
             setattr(entry, key, value)
         db.session.commit()
-        _recompute(user_id, entry.timestamp.date())
+        _recompute(user_id, entry.timestamp)
         return entry
 
     @jwt_required()
@@ -95,13 +95,15 @@ class LogEntryDetail(MethodView):
     def delete(self, entry_id):
         user_id = get_jwt_identity()
         entry = LogEntry.query.filter_by(id=entry_id, user_id=user_id).first_or_404()
-        entry_date = entry.timestamp.date()
+        entry_timestamp = entry.timestamp
         db.session.delete(entry)
         db.session.commit()
-        _recompute(user_id, entry_date)
+        _recompute(user_id, entry_timestamp)
 
 
-def _recompute(user_id: str, day) -> None:
+def _recompute(user_id: str, timestamp_utc) -> None:
     from app.analytics.tasks import recompute_daily_aggregate
+    from app.common.localtime import local_date_of, user_tz_offset
 
-    recompute_daily_aggregate.delay(user_id, day.isoformat())
+    offset = user_tz_offset(User.query.get_or_404(user_id))
+    recompute_daily_aggregate.delay(user_id, local_date_of(timestamp_utc, offset).isoformat(), offset)

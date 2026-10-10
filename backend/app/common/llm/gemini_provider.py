@@ -21,6 +21,7 @@ class GeminiProvider(LLMProvider):
         type_catalog: list[dict],
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
+        local_now=None,
     ) -> ExtractionResult:
         type_names = [t["name"] for t in type_catalog]
         # Deliberately NOT using response_schema: the entry payload differs per
@@ -28,10 +29,11 @@ class GeminiProvider(LLMProvider):
         # rejects an OBJECT schema without properties. JSON mode plus an
         # explicit shape in the prompt gets the same result without that limit.
         system = (
-            f"{build_system_prompt(type_catalog)}\n\n"
+            f"{build_system_prompt(type_catalog, local_now=local_now)}\n\n"
             "Respond with JSON only, in exactly this shape:\n"
             '{"entries": [{"type": "<one of: ' + ", ".join(type_names) + '>", '
-            '"payload": {<fields for that type>}, "summary": "<short one-liner>"}], '
+            '"payload": {<fields for that type>}, "summary": "<short one-liner>", '
+            '"occurred_at": "<local ISO 8601 date-time, ONLY if the message says when; otherwise omit the key>"}], '
             '"reply": "<short warm confirmation>"}\n'
             'If nothing is loggable, use {"entries": [], "reply": "..."}.'
         )
@@ -65,7 +67,12 @@ class GeminiProvider(LLMProvider):
                 raise first_error
 
         entries = [
-            ExtractedEntry(type=e["type"], payload=e.get("payload", {}) or {}, summary=e.get("summary", ""))
+            ExtractedEntry(
+                type=e["type"],
+                payload=e.get("payload", {}) or {},
+                summary=e.get("summary", ""),
+                occurred_at=e.get("occurred_at") or None,
+            )
             for e in (data.get("entries") or [])
             if isinstance(e, dict) and e.get("type") in type_names
         ]

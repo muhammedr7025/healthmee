@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -7,6 +8,9 @@ class ExtractedEntry:
     type: str
     payload: dict
     summary: str
+    # ISO 8601 *local* wall-clock time the thing happened, when the message
+    # said so ("yesterday", "for dinner", "at 7pm"); None means "now".
+    occurred_at: str | None = None
 
 
 @dataclass
@@ -28,11 +32,15 @@ class LLMProvider(ABC):
         type_catalog: list[dict],
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
+        local_now: datetime | None = None,
     ) -> ExtractionResult:
         """`image_bytes`/`image_mime_type` are set when the message included
         a photo (VitaChat's photo logging). Providers without vision
         support can ignore them — MockProvider does, honestly, rather than
         fabricating what's in a photo it can't see.
+
+        `local_now` is the user's current wall-clock time, so "yesterday"
+        and "for dinner" can be resolved to an `occurred_at`.
         """
         raise NotImplementedError
 

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timedelta
 
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
 
@@ -27,6 +28,11 @@ VOLUME_RE = re.compile(
 _UNIT_ML = {"glass": 250, "cup": 240, "bottle": 500, "l": 1000, "litre": 1000, "liter": 1000, "ml": 1}
 _DEFAULT_SERVING_ML = 250  # a plain "drank water" with no quantity = one glass
 
+# "at 7pm", "7:30 am", "19:00"
+_CLOCK_RE = re.compile(r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,2}):(\d{2})\b", re.IGNORECASE)
+# Same defaults the LLM prompt is given, so mock and real modes agree.
+_TIME_OF_DAY_HOURS = {"breakfast": 8, "morning": 8, "lunch": 13, "afternoon": 15, "evening": 18, "dinner": 20}
+
 
 def _has_word(text: str, word: str) -> bool:
     """Matches at a word start, so "run" still catches "running" but "ate"
@@ -47,6 +53,7 @@ class MockProvider(LLMProvider):
         type_catalog: list[dict],
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
+        local_now: datetime | None = None,
     ) -> ExtractionResult:
         lowered = text.lower()
         entries: list[ExtractedEntry] = []
@@ -108,8 +115,49 @@ class MockProvider(LLMProvider):
                 reply="Got it — I couldn't quite tell what to log from that. Could you say a bit more?",
             )
 
+        occurred_at = self._occurred_at(lowered, local_now)
+        if occurred_at is not None:
+            for entry in entries:
+                if entry.type != "sleep":  # a night's sleep belongs to the morning after — stays "now"
+                    entry.occurred_at = occurred_at
+
         summaries = "; ".join(e.summary for e in entries)
         return ExtractionResult(entries=entries, reply=f"Logged: {summaries}")
+
+    @staticmethod
+    def _occurred_at(lowered: str, local_now: datetime | None) -> str | None:
+        """Resolves "yesterday"/"for dinner"/"at 7pm" against the user's local
+        clock — the same rules the real providers are prompted with, so
+        offline mode logs to the same moment the LLM would."""
+        if local_now is None:
+            return None
+
+        day_shift = 0
+        if "day before yesterday" in lowered:
+            day_shift = -2
+        elif _has_word(lowered, "yesterday"):
+            day_shift = -1
+
+        hour = minute = None
+        clock = _CLOCK_RE.search(lowered)
+        if clock:
+            if clock.group(1):
+                hour = int(clock.group(1)) % 12 + (12 if clock.group(3).lower() == "pm" else 0)
+                minute = int(clock.group(2) or 0)
+            else:
+                hour, minute = int(clock.group(4)), int(clock.group(5))
+        else:
+            for word, h in _TIME_OF_DAY_HOURS.items():
+                if _has_word(lowered, word):
+                    hour, minute = h, 0
+                    break
+
+        if day_shift == 0 and hour is None:
+            return None  # nothing said when — it's now
+        if hour is None:
+            hour, minute = local_now.hour, local_now.minute  # "yesterday", same clock time
+        when = (local_now + timedelta(days=day_shift)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+        return when.isoformat(timespec="minutes")
 
     @staticmethod
     def _hydration(lowered: str) -> ExtractedEntry | None:

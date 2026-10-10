@@ -10,7 +10,7 @@ from app.logging.models import LogEntry
 
 
 class _RealisticButWrongProvider(LLMProvider):
-    def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None):
+    def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None, local_now=None):
         return ExtractionResult(
             entries=[
                 ExtractedEntry(type="sleep", payload={"hours": 5.0, "quality": "very poor"}, summary="Slept 5h, very poor"),

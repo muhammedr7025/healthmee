@@ -19,9 +19,10 @@ class OpenAIProvider(LLMProvider):
         type_catalog: list[dict],
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
+        local_now=None,
     ) -> ExtractionResult:
         tool = build_tool_schema(type_catalog)
-        system = build_system_prompt(type_catalog)
+        system = build_system_prompt(type_catalog, local_now=local_now)
 
         function_schema = {
             "type": "function",
@@ -46,7 +47,12 @@ class OpenAIProvider(LLMProvider):
         if message.tool_calls:
             data = json.loads(message.tool_calls[0].function.arguments)
             entries = [
-                ExtractedEntry(type=e["type"], payload=e.get("payload", {}), summary=e.get("summary", ""))
+                ExtractedEntry(
+                    type=e["type"],
+                    payload=e.get("payload", {}),
+                    summary=e.get("summary", ""),
+                    occurred_at=e.get("occurred_at"),
+                )
                 for e in data.get("entries", [])
             ]
             return ExtractionResult(entries=entries, reply=data.get("reply", ""))

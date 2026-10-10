@@ -16,6 +16,10 @@ class User(db.Model, TimestampMixin):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255), nullable=True)
     onboarding_completed = db.Column(db.Boolean, default=False, nullable=False)
+    # Minutes east of UTC, last seen from the app (see app/common/localtime.py).
+    # Lets background aggregation agree with the API about which local day
+    # an entry belongs to.
+    tz_offset_minutes = db.Column(db.Integer, nullable=False, default=0, server_default="0")
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -74,7 +78,7 @@ class PasswordResetToken(db.Model, TimestampMixin):
             return None
         if row.expires_at.replace(tzinfo=timezone.utc) < utcnow():
             return None
-        if row.token_hash != cls._hash(raw_token):
+        if not secrets.compare_digest(row.token_hash, cls._hash(raw_token)):
             row.attempts += 1
             return None
         return row

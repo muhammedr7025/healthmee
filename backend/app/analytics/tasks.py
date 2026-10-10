@@ -1,15 +1,22 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
+from app.accounts.models import User
 from app.analytics.models import DailyAggregate
+from app.common.localtime import local_day_bounds_utc
 from app.extensions import celery, db
 from app.logging.models import LogEntry
 
 
 @celery.task(name="analytics.recompute_daily_aggregate")
-def recompute_daily_aggregate(user_id: str, date_iso: str) -> None:
+def recompute_daily_aggregate(user_id: str, date_iso: str, tz_offset_minutes: int | None = None) -> None:
+    """`date_iso` is a *local* calendar day for this user. Callers with a
+    request in hand pass the offset they used; anything else falls back to
+    the last offset the user's app reported."""
     day = date.fromisoformat(date_iso)
-    start = datetime.combine(day, time.min)
-    end = start + timedelta(days=1)
+    if tz_offset_minutes is None:
+        user = User.query.get(user_id)
+        tz_offset_minutes = (user.tz_offset_minutes if user else 0) or 0
+    start, end = local_day_bounds_utc(day, tz_offset_minutes)
 
     entries = LogEntry.query.filter(
         LogEntry.user_id == user_id,

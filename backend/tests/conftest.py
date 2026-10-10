@@ -1,8 +1,15 @@
+from datetime import datetime
+
 import pytest
 
 from app import create_app
 from app.extensions import db
 from config import TestConfig
+
+# What the real app sends: the device's UTC offset in minutes. Using the test
+# machine's own offset means `date.today()` in a test and the server's idea
+# of "today" agree — which they otherwise don't for ~5.5 hours a day in IST.
+LOCAL_TZ_OFFSET_MINUTES = int(datetime.now().astimezone().utcoffset().total_seconds() // 60)
 
 
 @pytest.fixture()
@@ -26,4 +33,5 @@ def auth_client(client):
     resp = client.post("/api/v1/auth/login", json={"email": "test@example.com", "password": "password123"})
     token = resp.get_json()["access_token"]
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    client.environ_base["HTTP_X_TIMEZONE_OFFSET"] = str(LOCAL_TZ_OFFSET_MINUTES)
     return client
