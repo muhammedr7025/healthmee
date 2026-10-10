@@ -58,7 +58,9 @@ services:
     build: ./backend
     env_file: .env
     entrypoint: ["/app/entrypoint.sh"]
-    command: ["gunicorn", "-b", "0.0.0.0:5000", "-w", "2", "wsgi:app"]
+    # Threaded workers: LLM/SMTP/S3 waits don't pin a process, and the 60s
+    # timeout sits above the 20s LLM timeout so the offline fallback can run.
+    command: ["gunicorn", "-b", "0.0.0.0:5000", "-w", "2", "-k", "gthread", "--threads", "8", "--timeout", "60", "--access-logfile", "-", "wsgi:app"]
     ports:
       - "5001:5000"
     depends_on:
