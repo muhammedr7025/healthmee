@@ -276,7 +276,9 @@ def _recommendations(stats: dict, deltas: dict) -> list[str]:
     if stats["days_logged"] == 0:
         return ["Tell MeMe one thing today — even \"had lunch\" starts the picture."]
 
-    if stats["avg_water_ml"] is not None and stats["avg_water_ml"] < WATER_GOAL_ML:
+    if stats["avg_water_ml"] is not None and stats["avg_water_ml"] < 100:
+        out.append('Tell MeMe when you drink — even "had a glass of water" counts — nothing\'s been tracked this period.')
+    elif stats["avg_water_ml"] is not None and stats["avg_water_ml"] < WATER_GOAL_ML:
         out.append(f"Add one more glass of water a day — you averaged {stats['avg_water_ml'] / 1000:.1f} L against a 2 L goal.")
     if stats["days_total"] >= 7 and stats["total_activity_minutes"] < _activity_goal(stats):
         short = round(_activity_goal(stats) - stats["total_activity_minutes"])

@@ -33,15 +33,8 @@ class Today(MethodView):
         today = local_today(user_tz_offset(user))
         aggregate = DailyAggregate.query.filter_by(user_id=user_id, date=today).first()
         if aggregate is None:
-            return {
-                "date": today.isoformat(),
-                "total_calories": 0,
-                "activity_minutes": 0,
-                "sleep_hours": None,
-                "mood_score": None,
-                "water_ml": 0,
-                "log_count": 0,
-            }
+            # Same shape as a real row, so clients see every key on an empty day too.
+            return DailyAggregate(user_id=user_id, date=today, total_calories=0, activity_minutes=0, water_ml=0, log_count=0)
         return aggregate
 
 
