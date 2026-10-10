@@ -11,6 +11,12 @@ List<MapEntry<String, String>> formatLogRows(String type, Map<String, dynamic> p
         MapEntry(items.isEmpty ? 'Food' : items, payload['estimated_calories'] != null ? '≈ ${payload['estimated_calories']} kcal' : ''),
       ];
       if (payload['meal_type'] != null) rows.add(MapEntry('Meal', s(payload['meal_type'])));
+      final macros = [
+        if (payload['protein_g'] != null) 'P ${s(payload['protein_g'])}g',
+        if (payload['carbs_g'] != null) 'C ${s(payload['carbs_g'])}g',
+        if (payload['fat_g'] != null) 'F ${s(payload['fat_g'])}g',
+      ];
+      if (macros.isNotEmpty) rows.add(MapEntry('Macros', '≈ ${macros.join(' · ')}'));
       return rows;
     case 'sleep':
       final rows = <MapEntry<String, String>>[MapEntry('Hours', '${s(payload['hours'])}h')];

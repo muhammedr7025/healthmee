@@ -13,6 +13,9 @@ Rules:
 and a friendly reply asking for more detail.
 - Never invent precise medical values you can't infer from the text; omit optional \
 fields you're unsure about rather than guessing wildly.
+- For food, give a rough estimated_calories and, when the dish is recognisable, \
+protein_g / carbs_g / fat_g for the whole entry (typical portions; it's a journal, \
+not a lab). Mark estimates with "~" in the summary.
 - summary must be a short human-readable one-liner, e.g. "oatmeal + banana, ~320 kcal".
 """
 

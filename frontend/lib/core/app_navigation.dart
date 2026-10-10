@@ -7,6 +7,10 @@ final activeTabProvider = StateProvider<int>((ref) => 0);
 
 const chatTabIndex = 0;
 
-/// A message queued to appear in the Chat input the next time it builds —
+/// A message queued to be *sent* to MeMe the next time Chat builds —
 /// ChatScreen drains and clears this on init.
 final pendingChatMessageProvider = StateProvider<String?>((ref) => null);
+
+/// Text to put in the Chat input for the user to finish ("I had ", "BP ") —
+/// the Logbook's quick-log chips use this. Placed, not sent.
+final pendingChatDraftProvider = StateProvider<String?>((ref) => null);

@@ -28,12 +28,12 @@ class ChatThreadItem {
       ChatThreadItem._(kind: ChatItemKind.assistantReply, text: text);
 
   /// The "what I pulled out" extraction card (dev-prompt §7.2) — one row per
-  /// structured field, with a "Looks right" / "Edit" pair. The entry is
-  /// already saved server-side by the time this renders; "Looks right" just
-  /// dismisses the actions, "Edit" calls PATCH `/log-entries/{id}`.
-  /// [confirmed] defaults to false for a card that just got created in this
-  /// session; a card restored from history is passed in already confirmed,
-  /// since there's no pending action left to take on something from the past.
+  /// structured field, a "Saved to today" line and an Edit action that calls
+  /// PATCH `/log-entries/{id}`. The entry is already saved server-side by the
+  /// time this renders, so there is deliberately no confirm step: a tap that
+  /// changed nothing taught people the opposite of what was true.
+  /// [confirmed] is kept for history replay (cards restored from the server
+  /// are marked confirmed) but no longer changes what the card shows.
   factory ChatThreadItem.extractCard({
     required String entryId,
     required String logType,

@@ -8,6 +8,7 @@ import '../../../core/app_navigation.dart';
 import '../../reports/presentation/reports_screen.dart';
 import '../../today/domain/daily_aggregate.dart';
 import '../data/trends_repository.dart';
+import '../domain/narrative.dart';
 
 class _Metric {
   const _Metric(this.key, this.label, this.unit, this.get, this.color, {this.medical = false, this.hint});
@@ -419,6 +420,10 @@ class _ReadView extends ConsumerWidget {
                       ),
                       const SizedBox(height: 13),
                       Text(narrative.summary, style: HealthTypography.body(fontSize: 14, color: const Color(0xFF332C25))),
+                      if (narrative.momentum != null) ...[
+                        const SizedBox(height: 12),
+                        _MomentumRow(momentum: narrative.momentum!),
+                      ],
                     ],
                   ),
                 ),
@@ -429,16 +434,98 @@ class _ReadView extends ConsumerWidget {
                   crossAxisCount: 2,
                   mainAxisSpacing: 9,
                   crossAxisSpacing: 9,
-                  childAspectRatio: 2.1,
+                  childAspectRatio: 2.0,
                   children: [
-                    _StatTile(label: 'Days logged', value: '${narrative.stats.daysLogged}/${narrative.stats.daysTotal}'),
+                    _StatTile(
+                      label: 'Days logged',
+                      value: '${narrative.stats.daysLogged}/${narrative.stats.daysTotal}',
+                      delta: _deltaText(narrative.deltas['days_logged'], unit: ' days', decimals: 0),
+                    ),
                     _StatTile(label: 'Entries', value: '${narrative.stats.logCount}'),
                     if (narrative.stats.avgSleep != null)
-                      _StatTile(label: 'Avg sleep', value: '${narrative.stats.avgSleep!.toStringAsFixed(1)}h'),
+                      _StatTile(
+                        label: 'Avg sleep',
+                        value: '${narrative.stats.avgSleep!.toStringAsFixed(1)}h',
+                        delta: _deltaText(narrative.deltas['avg_sleep'], unit: 'h'),
+                      ),
                     if (narrative.stats.avgMood != null)
-                      _StatTile(label: 'Avg mood', value: '${narrative.stats.avgMood!.toStringAsFixed(1)}/5'),
+                      _StatTile(
+                        label: 'Avg mood',
+                        value: '${narrative.stats.avgMood!.toStringAsFixed(1)}/5',
+                        delta: _deltaText(narrative.deltas['avg_mood'], unit: ''),
+                      ),
+                    if (narrative.stats.avgWaterMl != null)
+                      _StatTile(
+                        label: 'Avg water',
+                        value: '${(narrative.stats.avgWaterMl! / 1000).toStringAsFixed(1)} L',
+                        delta: _deltaText(
+                          narrative.deltas['avg_water_ml'] == null ? null : narrative.deltas['avg_water_ml']! / 1000,
+                          unit: ' L',
+                        ),
+                      ),
+                    _StatTile(
+                      label: 'Active minutes',
+                      value: '${narrative.stats.totalActivityMinutes.round()}',
+                      delta: _deltaText(narrative.deltas['total_activity_minutes'], unit: ' min', decimals: 0),
+                    ),
+                    if (narrative.stats.avgWeightKg != null)
+                      _StatTile(
+                        label: 'Avg weight',
+                        value: '${narrative.stats.avgWeightKg!.toStringAsFixed(1)} kg',
+                        delta: _deltaText(narrative.deltas['avg_weight_kg'], unit: ' kg'),
+                      ),
+                    if (narrative.stats.avgSystolic != null)
+                      _StatTile(
+                        label: 'Avg blood pressure',
+                        value: narrative.stats.avgDiastolic == null
+                            ? '${narrative.stats.avgSystolic!.round()}'
+                            : '${narrative.stats.avgSystolic!.round()}/${narrative.stats.avgDiastolic!.round()}',
+                        delta: _deltaText(narrative.deltas['avg_systolic'], unit: ' sys', decimals: 0),
+                      ),
+                    if (narrative.stats.avgGlucoseMgDl != null)
+                      _StatTile(
+                        label: 'Avg blood sugar',
+                        value: '${narrative.stats.avgGlucoseMgDl!.round()} mg/dL',
+                        delta: _deltaText(narrative.deltas['avg_glucose_mg_dl'], unit: '', decimals: 0),
+                      ),
                   ],
                 ),
+                if (narrative.achievements.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _CalloutBox(
+                    label: 'ACHIEVEMENTS',
+                    labelColor: HealthColors.accentSecondary,
+                    bg: const Color(0xFFEEF0E2),
+                    borderColor: HealthColors.accentSecondary.withValues(alpha: 0.35),
+                    textColor: const Color(0xFF3C4A33),
+                    items: narrative.achievements,
+                    mascot: MascotState.celebrating,
+                  ),
+                ],
+                if (narrative.risks.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  _CalloutBox(
+                    label: 'WORTH SHOWING YOUR DOCTOR',
+                    labelColor: HealthColors.accentPrimaryDark,
+                    bg: const Color(0xFFFDEEE4),
+                    borderColor: HealthColors.accentPrimary.withValues(alpha: 0.3),
+                    textColor: HealthColors.reactionText,
+                    items: narrative.risks,
+                    mascot: MascotState.concerned,
+                  ),
+                ],
+                if (narrative.recommendations.isNotEmpty) ...[
+                  const SizedBox(height: 9),
+                  _CalloutBox(
+                    label: 'TRY NEXT',
+                    labelColor: HealthColors.inkPrimary,
+                    bg: HealthColors.surface,
+                    borderColor: HealthColors.inkPrimary.withValues(alpha: 0.12),
+                    textColor: HealthColors.inkPrimary,
+                    items: narrative.recommendations,
+                    bullet: '→',
+                  ),
+                ],
                 if (narrative.wins.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   _CalloutBox(
@@ -496,15 +583,58 @@ class _ReadView extends ConsumerWidget {
   }
 }
 
+/// "+0.4h vs last period" — null when there's nothing to compare, '—' when
+/// nothing changed.
+String? _deltaText(double? delta, {required String unit, int decimals = 1}) {
+  if (delta == null) return null;
+  if (delta.abs() < (decimals == 0 ? 0.5 : 0.05)) return 'same as last period';
+  final sign = delta > 0 ? '+' : '−';
+  return '$sign${delta.abs().toStringAsFixed(decimals)}$unit vs last period';
+}
+
+class _MomentumRow extends StatelessWidget {
+  const _MomentumRow({required this.momentum});
+  final Momentum momentum;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color, word) = switch (momentum.label) {
+      'building' => (Icons.trending_up, HealthColors.accentSecondary, 'Building'),
+      'slipping' => (Icons.trending_down, HealthColors.accentPrimaryDark, 'Slipping'),
+      'starting' => (Icons.flag_outlined, HealthColors.inkMuted, 'Starting out'),
+      _ => (Icons.trending_flat, HealthColors.inkMuted, 'Steady'),
+    };
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text('MOMENTUM · ${word.toUpperCase()}', style: HealthTypography.label(fontSize: 9.5, color: color)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(momentum.detail, style: HealthTypography.body(fontSize: 11.5, color: HealthColors.inkMuted))),
+      ],
+    );
+  }
+}
+
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
+  const _StatTile({required this.label, required this.value, this.delta});
   final String label;
   final String value;
+  final String? delta;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       decoration: BoxDecoration(
         color: HealthColors.surface,
         border: Border.all(color: HealthColors.inkPrimary.withValues(alpha: 0.09)),
@@ -515,8 +645,10 @@ class _StatTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(label, style: HealthTypography.label(fontSize: 10)),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(value, style: HealthTypography.display(fontSize: 19)),
+          if (delta != null)
+            Text(delta!, style: HealthTypography.body(fontSize: 10, color: HealthColors.inkFaint), maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -531,6 +663,8 @@ class _CalloutBox extends StatelessWidget {
     required this.borderColor,
     required this.textColor,
     required this.items,
+    this.mascot,
+    this.bullet,
   });
   final String label;
   final Color labelColor;
@@ -538,23 +672,43 @@ class _CalloutBox extends StatelessWidget {
   final Color borderColor;
   final Color textColor;
   final List<String> items;
+  final MascotState? mascot;
+  final String? bullet;
 
   @override
   Widget build(BuildContext context) {
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: HealthTypography.label(color: labelColor)),
+        const SizedBox(height: 8),
+        ...items.map((w) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: bullet == null
+                  ? Text(w, style: HealthTypography.body(fontSize: 13, color: textColor))
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('$bullet ', style: HealthTypography.body(fontSize: 13, color: labelColor)),
+                        Expanded(child: Text(w, style: HealthTypography.body(fontSize: 13, color: textColor))),
+                      ],
+                    ),
+            )),
+      ],
+    );
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: bg, border: Border.all(color: borderColor), borderRadius: BorderRadius.circular(18)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: HealthTypography.label(color: labelColor)),
-          const SizedBox(height: 8),
-          ...items.map((w) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(w, style: HealthTypography.body(fontSize: 13, color: textColor)),
-              )),
-        ],
-      ),
+      child: mascot == null
+          ? body
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                MemeMascot(state: mascot!, size: 36),
+                const SizedBox(width: 10),
+                Expanded(child: body),
+              ],
+            ),
     );
   }
 }

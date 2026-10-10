@@ -15,6 +15,9 @@ def register_builtin_types() -> None:
                     "enum": ["breakfast", "lunch", "dinner", "snack"],
                 },
                 "estimated_calories": {"type": "number", "required": False},
+                "protein_g": {"type": "number", "required": False},
+                "carbs_g": {"type": "number", "required": False},
+                "fat_g": {"type": "number", "required": False},
             },
             handlers=[allergy_check_handler],
         )

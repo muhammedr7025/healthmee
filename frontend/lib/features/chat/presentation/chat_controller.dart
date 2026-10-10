@@ -126,15 +126,6 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  void confirmEntry(String entryId) {
-    state = state.copyWith(
-      items: [
-        for (final item in state.items)
-          if (item.entryId == entryId) item.copyWith(confirmed: true) else item,
-      ],
-    );
-  }
-
   Future<void> editEntry(String entryId, String newSummaryLine) async {
     await _repo.editEntrySummary(entryId, newSummaryLine);
     state = state.copyWith(

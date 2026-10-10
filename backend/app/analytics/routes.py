@@ -6,15 +6,19 @@ from flask_smorest import Blueprint
 
 from app.accounts.models import User
 from app.analytics.models import DailyAggregate
-from app.common.localtime import local_today, user_tz_offset
 from app.analytics.narrative import build_period_narrative
 from app.analytics.schemas import (
     DailyAggregateSchema,
     NarrativeQuerySchema,
     NarrativeResponseSchema,
+    TodayScoreSchema,
     TrendsQuerySchema,
     TrendsResponseSchema,
 )
+from app.analytics.score import compute_today_score
+from app.common.localtime import local_today, user_tz_offset
+from app.goals.models import Goal
+from app.medications.service import day_plan
 
 blp = Blueprint("analytics", __name__, url_prefix="/api/v1", description="Today summary & trends")
 
@@ -41,6 +45,26 @@ class Today(MethodView):
         return aggregate
 
 
+@blp.route("/today/score")
+class TodayScore(MethodView):
+    """A habit score for today with its working shown — see analytics/score.py."""
+
+    @jwt_required()
+    @blp.response(200, TodayScoreSchema)
+    def get(self):
+        user = User.query.get_or_404(get_jwt_identity())
+        today = local_today(user_tz_offset(user))
+        aggregate = DailyAggregate.query.filter_by(user_id=user.id, date=today).first()
+        calorie_goal = _calorie_goal(user.id)
+        return compute_today_score(aggregate, calorie_goal, day_plan(user.id, today))
+
+
+def _calorie_goal(user_id: str) -> float | None:
+    goal = Goal.query.filter_by(user_id=user_id, type="calories", status="active").first()
+    value = (goal.target_value or {}).get("value") if goal else None
+    return float(value) if isinstance(value, (int, float)) else None
+
+
 @blp.route("/trends/narrative")
 class TrendsNarrative(MethodView):
     """The "read" tab (VitaChat Trends): an LLM-written reflection of the
@@ -52,8 +76,9 @@ class TrendsNarrative(MethodView):
     @blp.arguments(NarrativeQuerySchema, location="query")
     @blp.response(200, NarrativeResponseSchema)
     def get(self, args):
+        user = User.query.get_or_404(get_jwt_identity())
         return build_period_narrative(
-            get_jwt_identity(), args["period"], args.get("start"), args.get("end")
+            user.id, args["period"], args.get("start"), args.get("end"), today=local_today(user_tz_offset(user))
         )
 
 

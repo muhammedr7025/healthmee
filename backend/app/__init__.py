@@ -40,6 +40,7 @@ def _import_models():
     from app.logging import models as _logging_models  # noqa: F401
     from app.media import models as _media_models  # noqa: F401
     from app.medical_profile import models as _medical_profile_models  # noqa: F401
+    from app.medications import models as _medications_models  # noqa: F401
     from app.notifications import models as _notifications_models  # noqa: F401
     from app.push import models as _push_models  # noqa: F401
     from app.reports import models as _reports_models  # noqa: F401
@@ -54,6 +55,7 @@ def _register_blueprints(api: Api):
     from app.logging.routes import blp as logging_blp
     from app.media.routes import blp as media_blp
     from app.medical_profile.routes import blp as medical_profile_blp
+    from app.medications.routes import blp as medications_blp
     from app.notifications.routes import blp as notifications_blp
     from app.push.routes import blp as push_blp
     from app.reports.routes import blp as reports_blp
@@ -61,6 +63,7 @@ def _register_blueprints(api: Api):
     for blp in (
         accounts_blp,
         medical_profile_blp,
+        medications_blp,
         logging_blp,
         analytics_blp,
         goals_blp,

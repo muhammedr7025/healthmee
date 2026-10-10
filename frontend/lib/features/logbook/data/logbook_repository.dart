@@ -33,9 +33,24 @@ final logbookRepositoryProvider = Provider<LogbookRepository>((ref) => LogbookRe
 
 final logbookTypeFilterProvider = StateProvider<String?>((ref) => null);
 
+/// timeline | vitals | labs | symptoms — Vitals and Symptoms are fixed type
+/// views; Timeline honours the chip filter; Labs reads lab results instead.
+final logbookTabProvider = StateProvider<String>((ref) => 'timeline');
+
+/// The day being looked at, or null for every day.
+final logbookDayProvider = StateProvider<DateTime?>((ref) => null);
+
 final logbookEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((ref) {
-  final type = ref.watch(logbookTypeFilterProvider);
-  return ref.watch(logbookRepositoryProvider).fetchEntries(type: type);
+  final tab = ref.watch(logbookTabProvider);
+  final type = switch (tab) {
+    'vitals' => 'vital',
+    'symptoms' => 'symptom',
+    _ => ref.watch(logbookTypeFilterProvider),
+  };
+  final day = ref.watch(logbookDayProvider);
+  final start = day == null ? null : DateTime(day.year, day.month, day.day);
+  final end = start?.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+  return ref.watch(logbookRepositoryProvider).fetchEntries(type: type, start: start, end: end);
 });
 
 final todayEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((ref) {

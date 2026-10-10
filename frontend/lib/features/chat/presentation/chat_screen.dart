@@ -39,10 +39,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // A draft queued before this screen existed (first visit via a quick-log chip).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takeDraft(ref.read(pendingChatDraftProvider)));
+  }
+
+  @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Puts a Logbook quick-log line in the box to finish, cursor on the gap
+  /// ("Slept | hours") when there is one.
+  void _takeDraft(String? draft) {
+    if (draft == null) return;
+    ref.read(pendingChatDraftProvider.notifier).state = null;
+    _textController.text = draft;
+    final gap = draft.indexOf('  ');
+    _textController.selection = TextSelection.collapsed(offset: gap >= 0 ? gap + 1 : draft.length);
   }
 
   @override
@@ -58,6 +75,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _send(next));
       }
     });
+    // ...and the Logbook's quick-log chips queue a half-written line here.
+    ref.listen<String?>(pendingChatDraftProvider, (previous, next) => _takeDraft(next));
 
     return Scaffold(
       // AppShell's Scaffold already shrinks this screen's box for the
@@ -450,67 +469,42 @@ class _ExtractCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                if (!item.confirmed)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _CardButton(
-                            label: 'Looks right',
-                            dark: true,
-                            onTap: () => ref.read(chatControllerProvider.notifier).confirmEntry(item.entryId ?? ''),
+                // The entry is already saved by the time this card renders,
+                // so there's nothing to confirm — just say so, and offer Edit.
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check, size: 14, color: HealthColors.accentSecondary),
+                      const SizedBox(width: 6),
+                      Text('Saved to today', style: HealthTypography.body(fontSize: 12, color: HealthColors.accentSecondary)),
+                      const Spacer(),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _editDialog(context, ref),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 13, color: HealthColors.accentPrimaryDark),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Edit',
+                                style: HealthTypography.body(fontSize: 12, weight: FontWeight.w500, color: HealthColors.accentPrimaryDark),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(child: _CardButton(label: 'Edit', dark: false, onTap: () => _editDialog(context, ref))),
-                      ],
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check, size: 14, color: HealthColors.accentSecondary),
-                        const SizedBox(width: 6),
-                        Text('Saved to today', style: HealthTypography.body(fontSize: 12, color: HealthColors.accentSecondary)),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CardButton extends StatelessWidget {
-  const _CardButton({required this.label, required this.dark, required this.onTap});
-  final String label;
-  final bool dark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: dark ? HealthColors.inkPrimary : HealthColors.chipIdle,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          child: Center(
-            child: Text(
-              label,
-              style: HealthTypography.body(fontSize: 13, weight: FontWeight.w500, color: dark ? HealthColors.bgBase : HealthColors.inkPrimary),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
