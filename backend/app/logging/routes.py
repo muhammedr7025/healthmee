@@ -3,14 +3,16 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity, jwt_required
-from flask_smorest import Blueprint
+from flask_smorest import Blueprint, abort
 
 from app.accounts.models import User
+from app.notifications.models import AlertLog
 from app.billing.service import is_premium
 from app.extensions import db
 from app.logging.chat_history import get_chat_history
 from app.logging.extraction.pipeline import process_message
-from app.logging.models import LogEntry
+from app.logging.models import ChatMessage, LogEntry
+from app.logging.registry import sanitize_payload, validate_payload
 from app.logging.schemas import (
     ChatHistoryQuerySchema,
     ChatHistorySchema,
@@ -91,6 +93,19 @@ class LogEntryDetail(MethodView):
     def patch(self, data, entry_id):
         user_id = get_jwt_identity()
         entry = LogEntry.query.filter_by(id=entry_id, user_id=user_id).first_or_404()
+
+        if "structured_payload" in data:
+            # Same gate as extraction: an edit that doesn't fit the type's
+            # schema would otherwise sit in the row and crash every recompute
+            # of that day (float("lots")).
+            payload, _dropped = sanitize_payload(entry.type, data["structured_payload"])
+            errors = validate_payload(entry.type, payload)
+            if errors:
+                abort(422, message=f"That edit doesn't fit a {entry.type} entry: " + "; ".join(errors))
+            data["structured_payload"] = payload
+        if data.get("summary"):
+            data["summary"] = data["summary"][:255]
+
         for key, value in data.items():
             setattr(entry, key, value)
         db.session.commit()
@@ -103,14 +118,18 @@ class LogEntryDetail(MethodView):
         user_id = get_jwt_identity()
         entry = LogEntry.query.filter_by(id=entry_id, user_id=user_id).first_or_404()
         entry_timestamp = entry.timestamp
+        # The chat card for this entry goes with it; alerts it raised stay as
+        # a safety record, just no longer pointing at a row that's gone.
+        ChatMessage.query.filter_by(log_entry_id=entry.id).delete()
+        AlertLog.query.filter_by(log_entry_id=entry.id).update({"log_entry_id": None})
         db.session.delete(entry)
         db.session.commit()
         _recompute(user_id, entry_timestamp)
 
 
 def _recompute(user_id: str, timestamp_utc) -> None:
-    from app.analytics.tasks import recompute_daily_aggregate
+    from app.analytics.tasks import recompute_days
     from app.common.localtime import local_date_of, user_tz_offset
 
     offset = user_tz_offset(User.query.get_or_404(user_id))
-    recompute_daily_aggregate.delay(user_id, local_date_of(timestamp_utc, offset).isoformat(), offset)
+    recompute_days(user_id, [local_date_of(timestamp_utc, offset)], offset)

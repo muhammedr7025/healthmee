@@ -1,10 +1,41 @@
+from collections.abc import Iterable
 from datetime import date
+
+from flask import current_app
+from sqlalchemy.exc import IntegrityError
 
 from app.accounts.models import User
 from app.analytics.models import DailyAggregate
 from app.common.localtime import local_day_bounds_utc
 from app.extensions import celery, db
 from app.logging.models import LogEntry
+
+
+def recompute_days(user_id: str, days: Iterable[date], tz_offset_minutes: int | None) -> None:
+    """Recompute the given local days right now, in the request.
+
+    One small query per day, so the Today screen is correct the moment the
+    chat response lands — no worker lag to race against, and nothing that
+    can fail because Redis is down after the entry was already committed.
+    The Celery task below stays for scheduled reconciliation. A recompute
+    failure is logged, never raised: the entry is saved, the totals catch
+    up on the next write.
+    """
+    for day in days:
+        try:
+            recompute_daily_aggregate.run(user_id, day.isoformat(), tz_offset_minutes)
+        except IntegrityError:
+            # Two requests created this day's row at the same moment; the other
+            # one won, so redo the numbers on top of it.
+            db.session.rollback()
+            try:
+                recompute_daily_aggregate.run(user_id, day.isoformat(), tz_offset_minutes)
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("aggregate recompute failed twice for %s on %s", user_id, day)
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("aggregate recompute failed for %s on %s", user_id, day)
 
 
 @celery.task(name="analytics.recompute_daily_aggregate")

@@ -102,10 +102,19 @@ def sanitize_payload(type_name: str, payload: dict) -> tuple[dict, list[str]]:
     if definition is None:
         return payload, [f"Unknown log type '{type_name}'"]
 
-    cleaned = dict(payload)
+    cleaned = dict(payload) if isinstance(payload, dict) else {}
     dropped = []
     for field_name, spec in definition.schema.items():
-        if spec.get("required") or field_name not in cleaned:
+        if field_name not in cleaned:
+            continue
+        # Models return "7" for hours or "500" for ml often enough that
+        # rejecting the entry over the quotes would lose real logs.
+        if spec["type"] == "number" and isinstance(cleaned[field_name], str):
+            try:
+                cleaned[field_name] = float(cleaned[field_name].strip().replace(",", ""))
+            except ValueError:
+                pass
+        if spec.get("required"):
             continue
         errors = _field_errors(field_name, spec, cleaned[field_name])
         if errors:

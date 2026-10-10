@@ -1,5 +1,5 @@
 from flask.views import MethodView
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 
 from app.accounts.data_service import delete_account, export_account_data
@@ -12,6 +12,16 @@ from app.accounts.schemas import (
     TokenSchema,
     UserSchema,
 )
+
+
+def _tokens(user: User) -> dict:
+    """Access token for requests plus a long-lived refresh token, so the app
+    can stay signed in past the access expiry without storing the password."""
+    return {
+        "access_token": create_access_token(identity=user.id),
+        "refresh_token": create_refresh_token(identity=user.id),
+        "user": user,
+    }
 from app.common.email_service import send as send_email
 from app.common.models import utcnow
 from app.extensions import db
@@ -32,7 +42,7 @@ class Register(MethodView):
         db.session.add(user)
         db.session.commit()
 
-        return {"access_token": create_access_token(identity=user.id), "user": user}
+        return _tokens(user)
 
 
 @blp.route("/login")
@@ -44,7 +54,21 @@ class Login(MethodView):
         if user is None or not user.check_password(data["password"]):
             abort(401, message="Invalid email or password.")
 
-        return {"access_token": create_access_token(identity=user.id), "user": user}
+        return _tokens(user)
+
+
+@blp.route("/refresh")
+class Refresh(MethodView):
+    @jwt_required(refresh=True)
+    @blp.response(200, TokenSchema)
+    def post(self):
+        """Trade a valid refresh token for a fresh pair. The app calls this
+        from its 401 handler, so an expired access token is invisible to
+        the user instead of logging them out mid-session."""
+        user = User.query.get(get_jwt_identity())
+        if user is None:
+            abort(401, message="This account no longer exists.")
+        return _tokens(user)
 
 
 @blp.route("/me")

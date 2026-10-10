@@ -108,6 +108,8 @@ class _AddMedicationSheetState extends State<_AddMedicationSheet> {
             controller: _name,
             autofocus: true,
             textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}), // the Add button enables as soon as there's a name
             decoration: const InputDecoration(labelText: 'Name', hintText: 'Metformin'),
           ),
           const SizedBox(height: HealthSpacing.sm),

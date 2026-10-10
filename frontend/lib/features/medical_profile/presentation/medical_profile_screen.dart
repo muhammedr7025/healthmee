@@ -158,8 +158,18 @@ class _ProfileTab extends ConsumerWidget {
       padding: const EdgeInsets.all(HealthSpacing.md),
       children: [
         asyncAllergies.when(
-          loading: () => const SizedBox.shrink(),
-          error: (e, _) => const SizedBox.shrink(),
+          loading: () => const Padding(padding: EdgeInsets.only(bottom: HealthSpacing.lg), child: LinearProgressIndicator(minHeight: 3)),
+          // Safety-critical: never vanish quietly. Say it failed and offer a retry.
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.only(bottom: HealthSpacing.lg),
+            child: Row(
+              children: [
+                Expanded(child: AlertBanner(message: "Couldn't load your allergy list — the hard flags aren't being checked until it loads.", hard: true)),
+                const SizedBox(width: 8),
+                TextButton(onPressed: () => ref.invalidate(allergiesProvider), child: const Text('Retry')),
+              ],
+            ),
+          ),
           data: (allergies) => allergies.isEmpty
               ? const SizedBox.shrink()
               : Container(

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
 import '../features/chat/presentation/chat_screen.dart';
 import '../features/logbook/data/logbook_repository.dart';
 import '../features/logbook/presentation/logbook_screen.dart';
+import '../features/medications/data/medications_repository.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/today/data/today_repository.dart';
 import '../features/today/presentation/today_screen.dart';
@@ -27,6 +29,8 @@ class AppShell extends ConsumerWidget {
       case 1:
         ref.invalidate(todayAggregateProvider);
         ref.invalidate(todayEntriesProvider);
+        ref.invalidate(todayScoreProvider);
+        ref.invalidate(medicationsTodayProvider);
         break;
       case 2:
         ref.invalidate(trendsDataProvider);
@@ -47,6 +51,8 @@ class AppShell extends ConsumerWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) {
+          if (i == index) return; // re-tapping the current tab isn't a refetch
+          HapticFeedback.selectionClick();
           ref.read(activeTabProvider.notifier).state = i;
           _refreshTab(ref, i);
         },

@@ -8,7 +8,10 @@ class LogEntry(db.Model, TimestampMixin):
     this table (dev-prompt §6/§7 extensibility)."""
 
     __tablename__ = "log_entries"
-    __table_args__ = (db.Index("ix_log_entries_user_type_ts", "user_id", "type", "timestamp"),)
+    __table_args__ = (
+        db.Index("ix_log_entries_user_type_ts", "user_id", "type", "timestamp"),
+        db.Index("ix_log_entries_user_ts", "user_id", "timestamp"),
+    )
 
     id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
@@ -51,8 +54,10 @@ class ChatMessage(db.Model, TimestampMixin):
     kind = db.Column(db.String(20), nullable=False)
     text = db.Column(db.Text, nullable=True)
     media_asset_id = db.Column(db.String(36), db.ForeignKey("media_assets.id"), nullable=True)
-    log_entry_id = db.Column(db.String(36), db.ForeignKey("log_entries.id"), nullable=True)
-    alert_id = db.Column(db.String(36), db.ForeignKey("alert_logs.id"), nullable=True)
+    # SET NULL so deleting an entry (or alert) can't fail on a dangling bubble;
+    # the route also removes the entry's extract_card rows outright.
+    log_entry_id = db.Column(db.String(36), db.ForeignKey("log_entries.id", ondelete="SET NULL"), nullable=True, index=True)
+    alert_id = db.Column(db.String(36), db.ForeignKey("alert_logs.id", ondelete="SET NULL"), nullable=True, index=True)
 
     log_entry = db.relationship("LogEntry")
     alert = db.relationship("AlertLog")

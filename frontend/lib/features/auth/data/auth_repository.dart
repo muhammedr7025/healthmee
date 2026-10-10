@@ -26,14 +26,20 @@ class AuthRepository {
   }
 
   Future<AppUser> _handleTokenResponse(Map<String, dynamic> data) async {
-    await _storage.saveToken(data['access_token'] as String);
+    await _storage.saveTokens(access: data['access_token'] as String, refresh: data['refresh_token'] as String?);
     return AppUser.fromJson(data['user'] as Map<String, dynamic>);
   }
+
+  /// Whether a session is stored at all — lets the app tell "signed out"
+  /// from "signed in but offline" when the network is down at launch.
+  Future<bool> hasStoredSession() async => (await _storage.readToken()) != null;
 
   Future<AppUser?> currentUser() async {
     final token = await _storage.readToken();
     if (token == null) return null;
     try {
+      // The Dio layer refreshes an expired access token transparently; a
+      // 401 reaching here means the refresh token is gone too.
       final resp = await _dio.get('/auth/me');
       return AppUser.fromJson(resp.data as Map<String, dynamic>);
     } on DioException catch (e) {

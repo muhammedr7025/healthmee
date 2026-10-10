@@ -21,6 +21,7 @@ class UserSchema(Schema):
 
 class TokenSchema(Schema):
     access_token = fields.String(dump_only=True)
+    refresh_token = fields.String(dump_only=True)
     user = fields.Nested(UserSchema, dump_only=True)
 
 

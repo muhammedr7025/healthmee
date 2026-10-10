@@ -5,7 +5,7 @@ the others, since both need the complete list of "everything tied to this
 user" and that list needs to stay in sync as domains are added.
 """
 
-from app.accounts.models import User
+from app.accounts.models import PasswordResetToken, User
 from app.billing.models import Subscription
 from app.caregiver.models import CaregiverLink
 from app.extensions import db
@@ -75,6 +75,7 @@ def delete_account(user_id: str) -> None:
     NarrativeCache.query.filter_by(user_id=user_id).delete()
     MedicationDose.query.filter_by(user_id=user_id).delete()
     MedicationSchedule.query.filter_by(user_id=user_id).delete()
+    PasswordResetToken.query.filter_by(user_id=user_id).delete()
 
     User.query.filter_by(id=user_id).delete()
     db.session.commit()

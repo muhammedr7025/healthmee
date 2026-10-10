@@ -12,6 +12,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    _register_jwt_errors()
     cors.init_app(app)
     init_celery(app)
 
@@ -29,6 +30,27 @@ def create_app(config_class=Config):
         return {"status": "ok"}
 
     return app
+
+
+def _register_jwt_errors():
+    """Auth failures in the same {code, status, message} shape flask-smorest
+    uses for everything else, so the app parses one error format and the
+    message can be shown as-is."""
+
+    def _unauthorized(message):
+        return {"code": 401, "status": "Unauthorized", "message": message}, 401
+
+    @jwt.unauthorized_loader
+    def _missing(reason):
+        return _unauthorized("Sign in to continue.")
+
+    @jwt.invalid_token_loader
+    def _invalid(reason):
+        return _unauthorized("Your session is no longer valid — please sign in again.")
+
+    @jwt.expired_token_loader
+    def _expired(jwt_header, jwt_payload):
+        return _unauthorized("Your session expired — please sign in again.")
 
 
 def _import_models():

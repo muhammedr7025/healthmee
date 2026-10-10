@@ -2,6 +2,12 @@ import 'dart:typed_data';
 
 enum ChatItemKind { userText, userPhoto, assistantReply, alert, extractCard }
 
+/// Delivery state of something the user sent. Restored history is always
+/// `sent`; a message typed this session is `pending` until the server has
+/// it and `failed` if it never got there — shown on the bubble with a
+/// tap-to-retry, never silently dropped.
+enum SendStatus { sent, pending, failed }
+
 class ChatThreadItem {
   const ChatThreadItem._({
     required this.kind,
@@ -14,15 +20,31 @@ class ChatThreadItem {
     this.confirmed = false,
     this.photoBytes,
     this.photoUrl,
+    this.status = SendStatus.sent,
+    this.clientId,
   });
 
-  factory ChatThreadItem.userText(String text) => ChatThreadItem._(kind: ChatItemKind.userText, text: text);
+  factory ChatThreadItem.userText(String text, {SendStatus status = SendStatus.sent, String? clientId}) =>
+      ChatThreadItem._(kind: ChatItemKind.userText, text: text, status: status, clientId: clientId);
 
   /// [bytes] is set for a photo just taken/picked this session; a photo
   /// restored from history instead carries [photoUrl] (a presigned download
   /// link) since raw bytes aren't kept around client-side between launches.
-  factory ChatThreadItem.userPhoto({Uint8List? bytes, String? photoUrl, String? caption}) =>
-      ChatThreadItem._(kind: ChatItemKind.userPhoto, photoBytes: bytes, photoUrl: photoUrl, text: caption);
+  factory ChatThreadItem.userPhoto({
+    Uint8List? bytes,
+    String? photoUrl,
+    String? caption,
+    SendStatus status = SendStatus.sent,
+    String? clientId,
+  }) =>
+      ChatThreadItem._(
+        kind: ChatItemKind.userPhoto,
+        photoBytes: bytes,
+        photoUrl: photoUrl,
+        text: caption,
+        status: status,
+        clientId: clientId,
+      );
 
   factory ChatThreadItem.assistantReply(String text) =>
       ChatThreadItem._(kind: ChatItemKind.assistantReply, text: text);
@@ -63,8 +85,13 @@ class ChatThreadItem {
   final bool confirmed;
   final Uint8List? photoBytes;
   final String? photoUrl;
+  final SendStatus status;
 
-  ChatThreadItem copyWith({String? summary, bool? confirmed}) => ChatThreadItem._(
+  /// Identifies a message sent this session so its bubble can be updated
+  /// (pending → sent/failed) and retried.
+  final String? clientId;
+
+  ChatThreadItem copyWith({String? summary, bool? confirmed, SendStatus? status}) => ChatThreadItem._(
         kind: kind,
         text: text,
         logType: logType,
@@ -75,5 +102,7 @@ class ChatThreadItem {
         confirmed: confirmed ?? this.confirmed,
         photoBytes: photoBytes,
         photoUrl: photoUrl,
+        status: status ?? this.status,
+        clientId: clientId,
       );
 }

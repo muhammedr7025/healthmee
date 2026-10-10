@@ -12,6 +12,7 @@ import json
 from datetime import date, timedelta
 
 from app.analytics.models import DailyAggregate, NarrativeCache
+from app.analytics.targets import ACTIVITY_GOAL_MINUTES_PER_WEEK, WATER_GOAL_ML
 from app.common.llm import get_llm_provider
 from app.extensions import db
 
@@ -20,9 +21,6 @@ PERIODS = {
     "week": 7,
     "month": 30,
 }
-
-WATER_GOAL_ML = 2000
-ACTIVITY_GOAL_MINUTES_PER_WEEK = 150
 
 
 def build_period_narrative(
@@ -279,7 +277,10 @@ def _recommendations(stats: dict, deltas: dict) -> list[str]:
     if stats["avg_water_ml"] is not None and stats["avg_water_ml"] < 100:
         out.append('Tell MeMe when you drink — even "had a glass of water" counts — nothing\'s been tracked this period.')
     elif stats["avg_water_ml"] is not None and stats["avg_water_ml"] < WATER_GOAL_ML:
-        out.append(f"Add one more glass of water a day — you averaged {stats['avg_water_ml'] / 1000:.1f} L against a 2 L goal.")
+        out.append(
+            f"Add one more glass of water a day — you averaged {stats['avg_water_ml'] / 1000:.1f} L "
+            f"against a {WATER_GOAL_ML / 1000:.1f} L goal."
+        )
     if stats["days_total"] >= 7 and stats["total_activity_minutes"] < _activity_goal(stats):
         short = round(_activity_goal(stats) - stats["total_activity_minutes"])
         out.append(f"A 20-minute walk on three days would close the {short}-minute gap to 150 active minutes a week.")

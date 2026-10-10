@@ -1,10 +1,23 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from app import create_app
 from app.extensions import db
 from config import TestConfig
+
+
+@event.listens_for(Engine, "connect")
+def _enforce_sqlite_foreign_keys(dbapi_connection, connection_record):
+    """SQLite ignores foreign keys unless asked. Production is Postgres,
+    which doesn't — a delete that passed here and 500'd there is exactly
+    what this pragma exists to catch."""
+    if type(dbapi_connection).__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # What the real app sends: the device's UTC offset in minutes. Using the test
 # machine's own offset means `date.today()` in a test and the server's idea

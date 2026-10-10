@@ -151,7 +151,10 @@ class LabResults(MethodView):
     @blp.arguments(LabResultSchema)
     @blp.response(201, LabResultSchema)
     def post(self, data):
-        lab_result = LabResult(user_id=get_jwt_identity(), **data)
+        user_id = get_jwt_identity()
+        if data.get("media_asset_id") and not MediaAsset.query.filter_by(id=data["media_asset_id"], user_id=user_id).first():
+            abort(404, message="Unknown media asset.")
+        lab_result = LabResult(user_id=user_id, **data)
         db.session.add(lab_result)
         db.session.commit()
         return lab_result

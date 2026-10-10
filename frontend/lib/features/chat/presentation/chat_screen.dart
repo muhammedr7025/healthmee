@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,17 +25,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollController = ScrollController();
 
   void _send([String? text]) {
-    final message = text ?? _textController.text;
+    final message = (text ?? _textController.text).trim();
+    if (message.isEmpty) return;
+    HapticFeedback.lightImpact();
     _textController.clear();
     ref.read(chatControllerProvider.notifier).sendMessage(message);
+    _scrollToNewest();
+  }
+
+  /// The thread is reversed, so the newest bubble lives at offset 0. When a
+  /// reply arrives while the user is reading older messages, leave them be.
+  void _scrollToNewest({bool onlyIfNearBottom = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 160,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      if (!_scrollController.hasClients) return;
+      if (onlyIfNearBottom && _scrollController.offset > 240) return;
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     });
   }
 
@@ -78,6 +83,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // ...and the Logbook's quick-log chips queue a half-written line here.
     ref.listen<String?>(pendingChatDraftProvider, (previous, next) => _takeDraft(next));
 
+    // A reply landing is the one moment worth a tap — and only while Chat
+    // is the tab on screen, not from a background send.
+    ref.listen<int>(chatControllerProvider.select((s) => s.items.length), (previous, next) {
+      if (previous == null || next <= previous) return;
+      final items = ref.read(chatControllerProvider).items;
+      if (items.isNotEmpty && items.last.kind == ChatItemKind.assistantReply && ref.read(activeTabProvider) == chatTabIndex) {
+        HapticFeedback.mediumImpact();
+      }
+      _scrollToNewest(onlyIfNearBottom: true);
+    });
+
     return Scaffold(
       // AppShell's Scaffold already shrinks this screen's box for the
       // keyboard; applying the inset again here too pushed the input bar and
@@ -95,15 +111,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ? GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => FocusScope.of(context).unfocus(),
-                      child: const _EmptyState(),
+                      child: _EmptyState(
+                        historyFailed: chatState.historyFailed,
+                        onRetry: () => ref.read(chatControllerProvider.notifier).reloadHistory(),
+                      ),
                     )
-                  // Lazy: history restores up to a few hundred bubbles on
-                  // launch, and the thread rebuilds every time the typing
-                  // indicator toggles — building only what's on screen keeps
-                  // that cheap. Slot 0 is the day label, the last slot is the
-                  // typing bubble.
+                  // Lazy and reversed: history restores up to a few hundred
+                  // bubbles, so only what's on screen is built — and index 0
+                  // is the *newest* item, which is where a chat opens and
+                  // where new bubbles appear without any scrolling logic.
+                  // Slot 0 is the typing bubble; the last slot is the label
+                  // at the very top of the thread.
                   : ListView.builder(
                       controller: _scrollController,
+                      reverse: true,
                       // Swiping the thread dismisses the keyboard — the main
                       // way back out to the nav bar while typing.
                       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -111,19 +132,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       itemCount: chatState.items.length + 2,
                       itemBuilder: (context, index) {
                         if (index == 0) {
+                          return chatState.isThinking ? const _TypingBubble() : const SizedBox.shrink();
+                        }
+                        if (index == chatState.items.length + 1) {
                           return Center(
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
-                              child: Text('TODAY', style: HealthTypography.label()),
+                              child: Text('YOUR THREAD WITH MEME', style: HealthTypography.label()),
                             ),
                           );
                         }
-                        if (index == chatState.items.length + 1) {
-                          return chatState.isThinking ? const _TypingBubble() : const SizedBox.shrink();
-                        }
                         return Padding(
                           padding: const EdgeInsets.only(bottom: HealthSpacing.sm + 4),
-                          child: _ThreadItemView(item: chatState.items[index - 1]),
+                          child: _ThreadItemView(item: chatState.items[chatState.items.length - index]),
                         );
                       },
                     ),
@@ -190,7 +211,12 @@ class _ChatHeader extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({this.historyFailed = false, this.onRetry});
+
+  /// The thread couldn't be fetched — say so, rather than showing a "nothing
+  /// yet" that looks exactly like lost history.
+  final bool historyFailed;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -200,13 +226,19 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const MemeMascot(state: MascotState.happy, size: 96),
+            MemeMascot(state: historyFailed ? MascotState.concerned : MascotState.happy, size: 96),
             const SizedBox(height: HealthSpacing.md),
             Text(
-              'Nothing logged yet today — tell MeMe what you had for breakfast.',
+              historyFailed
+                  ? "I couldn't load our conversation just now. Everything you've logged is safe on the server."
+                  : 'Nothing logged yet today — tell MeMe what you had for breakfast.',
               style: HealthTypography.mascotSpeech(),
               textAlign: TextAlign.center,
             ),
+            if (historyFailed) ...[
+              const SizedBox(height: HealthSpacing.sm),
+              TextButton(onPressed: onRetry, child: const Text('Try again')),
+            ],
           ],
         ),
       ),
@@ -283,26 +315,31 @@ class _ThreadItemView extends ConsumerWidget {
       case ChatItemKind.userText:
         return Align(
           alignment: Alignment.centerRight,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-            decoration: const BoxDecoration(
-              color: HealthColors.inkPrimary,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(18),
-                topRight: Radius.circular(18),
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(6),
+          child: _SendStatusWrap(
+            item: item,
+            child: Container(
+              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+              decoration: const BoxDecoration(
+                color: HealthColors.inkPrimary,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(18),
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(6),
+                ),
               ),
+              child: Text(item.text ?? '', style: HealthTypography.body(color: HealthColors.bgBase, fontSize: 14.5)),
             ),
-            child: Text(item.text ?? '', style: HealthTypography.body(color: HealthColors.bgBase, fontSize: 14.5)),
           ),
         );
 
       case ChatItemKind.userPhoto:
         return Align(
           alignment: Alignment.centerRight,
-          child: Column(
+          child: _SendStatusWrap(
+            item: item,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               ClipRRect(
@@ -319,7 +356,7 @@ class _ThreadItemView extends ConsumerWidget {
               if (item.text != null) ...[
                 const SizedBox(height: 6),
                 Container(
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                  constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
                   padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
                   decoration: const BoxDecoration(
                     color: HealthColors.inkPrimary,
@@ -335,6 +372,7 @@ class _ThreadItemView extends ConsumerWidget {
               ],
             ],
           ),
+          ),
         );
 
       case ChatItemKind.assistantReply:
@@ -345,7 +383,7 @@ class _ThreadItemView extends ConsumerWidget {
             const SizedBox(width: HealthSpacing.sm),
             Flexible(
               child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.68),
+                constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.68),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                 decoration: BoxDecoration(
                   color: HealthColors.surface,
@@ -414,6 +452,59 @@ class _ThreadItemView extends ConsumerWidget {
       case ChatItemKind.extractCard:
         return _ExtractCard(item: item);
     }
+  }
+}
+
+/// Pending bubbles sit at reduced opacity with "Sending…"; failed ones get a
+/// terracotta "Not sent · Tap to retry" that re-queues the same message.
+class _SendStatusWrap extends ConsumerWidget {
+  const _SendStatusWrap({required this.item, required this.child});
+  final ChatThreadItem item;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = item.status == SendStatus.pending;
+    final failed = item.status == SendStatus.failed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedOpacity(duration: const Duration(milliseconds: 200), opacity: pending ? 0.6 : 1, child: child),
+        if (pending)
+          Padding(
+            padding: const EdgeInsets.only(top: 3, right: 4),
+            child: Text('Sending…', style: HealthTypography.body(fontSize: 10.5, color: HealthColors.inkFaint)),
+          ),
+        if (failed)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: item.clientId == null
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      ref.read(chatControllerProvider.notifier).retry(item.clientId!);
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline, size: 13, color: HealthColors.accentPrimaryDark),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Not sent · Tap to retry',
+                      style: HealthTypography.body(fontSize: 11.5, weight: FontWeight.w500, color: HealthColors.accentPrimaryDark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -589,6 +680,10 @@ class _QuickRepliesAndInput extends ConsumerWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    minLines: 1,
+                    maxLines: 4, // long messages wrap instead of scrolling sideways
+                    keyboardType: TextInputType.multiline,
+                    textCapitalization: TextCapitalization.sentences,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => onSend(),
                     decoration: const InputDecoration(

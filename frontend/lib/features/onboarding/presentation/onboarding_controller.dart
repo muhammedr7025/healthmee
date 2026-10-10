@@ -70,5 +70,6 @@ class OnboardingController extends StateNotifier<OnboardingDraft> {
 }
 
 final onboardingControllerProvider = StateNotifierProvider<OnboardingController, OnboardingDraft>((ref) {
+  ref.watch(currentUserIdProvider); // a fresh draft per account, never the previous user's half-filled one
   return OnboardingController(ref.watch(onboardingRepositoryProvider), ref);
 });

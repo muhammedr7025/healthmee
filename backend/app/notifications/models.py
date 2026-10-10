@@ -30,7 +30,7 @@ class AlertLog(db.Model, TimestampMixin):
 
     id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
-    log_entry_id = db.Column(db.String(36), db.ForeignKey("log_entries.id"), nullable=True)
+    log_entry_id = db.Column(db.String(36), db.ForeignKey("log_entries.id", ondelete="SET NULL"), nullable=True, index=True)
     trigger_type = db.Column(db.String(64), nullable=False)  # allergy|goal_conflict|...
     severity = db.Column(db.String(10), nullable=False)  # hard|soft
     message = db.Column(db.Text, nullable=False)

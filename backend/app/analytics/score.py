@@ -9,9 +9,8 @@ UI says so.
 """
 
 from app.analytics.models import DailyAggregate
+from app.analytics.targets import ACTIVITY_GOAL_MINUTES_PER_DAY as ACTIVITY_GOAL_MINUTES, WATER_GOAL_ML
 
-WATER_GOAL_ML = 2500  # matches the Today tile's "Goal 2.5 L"
-ACTIVITY_GOAL_MINUTES = 30
 DEFAULT_CALORIE_GOAL = 2000
 
 

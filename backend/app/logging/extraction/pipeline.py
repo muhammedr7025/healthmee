@@ -78,11 +78,16 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
     image_mime_type = None
     if media_asset_id:
         asset = MediaAsset.query.filter_by(id=media_asset_id, user_id=user.id).first()
-        if asset and asset.kind == "photo":
+        if asset is None:
+            # Not this user's asset (or not an asset at all): never store the
+            # id, or history would later presign someone else's object.
+            media_asset_id = None
+        elif asset.kind == "photo":
             try:
                 image_bytes = download_bytes(asset.storage_key)
                 image_mime_type = asset.content_type
             except Exception:
+                current_app.logger.exception("photo download failed for asset %s; extracting text-only", asset.id)
                 image_bytes = None  # object storage hiccup — degrade to text-only rather than failing the message
 
     tz_offset = user_tz_offset(user)
@@ -112,7 +117,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
             type=extracted.type,
             structured_payload=payload,
             raw_text=text,
-            summary=extracted.summary,
+            summary=(extracted.summary or "")[:255],  # column width; a chatty model shouldn't 500 the save
             media_asset_id=media_asset_id,
         )
         when = _timestamp_for(extracted, now_local, tz_offset)
@@ -134,10 +139,11 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
     db.session.commit()
 
     if touched_dates:
-        from app.analytics.tasks import recompute_daily_aggregate
+        from app.analytics.tasks import recompute_days
 
-        for date in touched_dates:
-            recompute_daily_aggregate.delay(user.id, date.isoformat(), tz_offset)
+        # Inline, not queued: Today must be right the moment this response
+        # lands, and a queue hiccup must never turn a saved entry into a 500.
+        recompute_days(user.id, touched_dates, tz_offset)
 
     return {
         "entries": [e.to_dict() for e in created_entries],

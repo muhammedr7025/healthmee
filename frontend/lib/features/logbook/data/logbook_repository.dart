@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../domain/log_entry.dart';
 
 class LogbookRepository {
@@ -31,14 +32,24 @@ class LogbookRepository {
 
 final logbookRepositoryProvider = Provider<LogbookRepository>((ref) => LogbookRepository(ref.watch(dioProvider)));
 
-final logbookTypeFilterProvider = StateProvider<String?>((ref) => null);
+// Each of these resets when a different account signs in.
+final logbookTypeFilterProvider = StateProvider<String?>((ref) {
+  ref.watch(currentUserIdProvider);
+  return null;
+});
 
 /// timeline | vitals | labs | symptoms — Vitals and Symptoms are fixed type
 /// views; Timeline honours the chip filter; Labs reads lab results instead.
-final logbookTabProvider = StateProvider<String>((ref) => 'timeline');
+final logbookTabProvider = StateProvider<String>((ref) {
+  ref.watch(currentUserIdProvider);
+  return 'timeline';
+});
 
 /// The day being looked at, or null for every day.
-final logbookDayProvider = StateProvider<DateTime?>((ref) => null);
+final logbookDayProvider = StateProvider<DateTime?>((ref) {
+  ref.watch(currentUserIdProvider);
+  return null;
+});
 
 final logbookEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((ref) {
   final tab = ref.watch(logbookTabProvider);
