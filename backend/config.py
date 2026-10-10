@@ -74,6 +74,28 @@ class Config:
     SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "no-reply@healthmee.app")
     SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "true").lower() != "false"
 
+    # Observability. SENTRY_DSN unset = no error tracking (logs only).
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+    SENTRY_DSN = os.environ.get("SENTRY_DSN")
+    SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "production")
+    SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", 0.1))
+
+    # Rate limiting (Flask-Limiter) — counters live in Redis so all gunicorn
+    # workers share them. Mobile apps don't need CORS; "*" is kept for the
+    # Swagger UI and any future web client, override with CORS_ORIGINS.
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0"))
+    RATELIMIT_HEADERS_ENABLED = True
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
+    ALLOW_INSECURE_DEFAULTS = os.environ.get("ALLOW_INSECURE_DEFAULTS") == "1"
+
+    # Largest upload the LLM readers will accept (a 20-page PDF is ~2 MB).
+    MAX_MEDIA_BYTES = int(os.environ.get("MAX_MEDIA_BYTES", 15 * 1024 * 1024))
+    # Real providers: fail fast and fall back to the offline extractor rather
+    # than hold a worker for the SDK default of ten minutes.
+    LLM_TIMEOUT_SECONDS = float(os.environ.get("LLM_TIMEOUT_SECONDS", 20))
+
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+
     API_TITLE = "Health API"
     API_VERSION = "v1"
     OPENAPI_VERSION = "3.0.3"
@@ -85,4 +107,7 @@ class Config:
 class TestConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_ENGINE_OPTIONS = {}
     LLM_PROVIDER = "mock"
+    RATELIMIT_ENABLED = False
+    RATELIMIT_STORAGE_URI = "memory://"

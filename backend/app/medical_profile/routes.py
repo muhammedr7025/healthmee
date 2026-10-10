@@ -1,3 +1,4 @@
+import time
 from datetime import date, timezone
 
 from flask.views import MethodView
@@ -6,10 +7,11 @@ from flask_smorest import Blueprint, abort
 
 from app.accounts.models import User
 from app.common.llm import get_llm_provider
-from app.extensions import db
+from app.events.service import record_llm_call, track
+from app.extensions import db, limiter, user_or_ip
 from app.goals.models import Goal
 from app.media.models import MediaAsset
-from app.media.storage import download_bytes
+from app.media.storage import MediaTooLarge, download_bytes
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.medical_profile.schemas import (
     AllergySchema,
@@ -62,6 +64,15 @@ class Onboarding(MethodView):
 
         user.onboarding_completed = True
         db.session.commit()
+        track(
+            "onboarding_complete",
+            user.id,
+            conditions=len(data["conditions"]),
+            medications=len(data["medications"]),
+            allergies=len(data["allergies"]),
+            goals=len(data["goals"]),
+            has_name=bool(data.get("full_name")),
+        )
         return profile
 
 
@@ -171,6 +182,8 @@ class ScanLabReport(MethodView):
     candidates rather than inventing lab values.
     """
 
+    decorators = [limiter.limit("20/hour", key_func=user_or_ip)]
+
     @jwt_required()
     @blp.arguments(ScanLabReportSchema)
     @blp.response(200, LabScanResponseSchema)
@@ -182,11 +195,32 @@ class ScanLabReport(MethodView):
 
         try:
             file_bytes = download_bytes(asset.storage_key)
+        except MediaTooLarge as too_large:
+            abort(413, message=f"That file is {too_large.size // (1024 * 1024)} MB — the limit is {too_large.limit // (1024 * 1024)} MB. Try a photo of the page.")
         except Exception:
             abort(502, message="Couldn't read that file from storage — please try again.")
 
         default_mime = "application/pdf" if asset.kind == "document" else "image/jpeg"
-        report = get_llm_provider().read_lab_report(file_bytes, asset.content_type or default_mime)
+        provider = get_llm_provider()
+        started = time.perf_counter()
+        report = provider.read_lab_report(file_bytes, asset.content_type or default_mime)
+        record_llm_call(
+            purpose="lab_report",
+            provider=provider.name,
+            model=provider.model_name,
+            latency_ms=round((time.perf_counter() - started) * 1000),
+            user_id=user_id,
+            has_media=True,
+            output_entries=len(report.get("results", [])),
+            usage=getattr(provider, "last_usage", None),
+        )
+        track(
+            "lab_scan_read",
+            user_id,
+            source=asset.kind,
+            candidates=len(report.get("results", [])),
+            report_date_detected=report.get("report_date") is not None,
+        )
         return {
             "report_date": report.get("report_date"),
             "media_asset_id": asset.id,
@@ -199,6 +233,8 @@ class LabResultsBulk(MethodView):
     """Saves the rows the user kept from a scan's review sheet, all dated
     with the report's date (or whatever date they picked) rather than the
     moment they happened to upload it."""
+
+    decorators = [limiter.limit("30/hour", key_func=user_or_ip)]
 
     @jwt_required()
     @blp.arguments(LabResultsBulkSchema)
@@ -219,4 +255,5 @@ class LabResultsBulk(MethodView):
         ]
         db.session.add_all(results)
         db.session.commit()
+        track("lab_results_saved", user_id, kept=len(results), from_scan=media_asset_id is not None)
         return results

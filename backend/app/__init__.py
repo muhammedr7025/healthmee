@@ -2,19 +2,27 @@ from flask import Flask
 from flask_smorest import Api
 
 from config import Config
-from app.extensions import cors, db, init_celery, jwt, migrate
+from app.extensions import cors, db, init_celery, jwt, limiter, migrate
+
+_INSECURE_DEFAULTS = {"dev-secret-change-me", "dev-jwt-secret-change-me"}
 
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    _refuse_insecure_defaults(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
     _register_jwt_errors()
-    cors.init_app(app)
+    cors.init_app(app, origins=app.config.get("CORS_ORIGINS", "*"))
+    limiter.init_app(app)
     init_celery(app)
+
+    from app.common.observability import init_observability
+
+    init_observability(app)
 
     _import_models()
 
@@ -25,11 +33,18 @@ def create_app(config_class=Config):
     api = Api(app)
     _register_blueprints(api)
 
-    @app.get("/health")
-    def health_check():
-        return {"status": "ok"}
-
     return app
+
+
+def _refuse_insecure_defaults(app: Flask) -> None:
+    """A production process must not start with the dev secrets: anyone who
+    has read config.py could mint a valid JWT for any account. Tests and
+    explicit local dev (ALLOW_INSECURE_DEFAULTS=1) are exempt."""
+    if app.config.get("TESTING") or app.config.get("ALLOW_INSECURE_DEFAULTS"):
+        return
+    bad = [key for key in ("SECRET_KEY", "JWT_SECRET_KEY") if app.config.get(key) in _INSECURE_DEFAULTS]
+    if bad:
+        raise RuntimeError(f"Refusing to start with default {', '.join(bad)}. Set them in the environment (or ALLOW_INSECURE_DEFAULTS=1 for local dev).")
 
 
 def _register_jwt_errors():
@@ -58,6 +73,7 @@ def _import_models():
     from app.analytics import models as _analytics_models  # noqa: F401
     from app.billing import models as _billing_models  # noqa: F401
     from app.caregiver import models as _caregiver_models  # noqa: F401
+    from app.events import models as _events_models  # noqa: F401
     from app.goals import models as _goals_models  # noqa: F401
     from app.logging import models as _logging_models  # noqa: F401
     from app.media import models as _media_models  # noqa: F401
@@ -73,6 +89,7 @@ def _register_blueprints(api: Api):
     from app.analytics.routes import blp as analytics_blp
     from app.billing.routes import blp as billing_blp
     from app.caregiver.routes import blp as caregiver_blp
+    from app.events.routes import blp as events_blp
     from app.goals.routes import blp as goals_blp
     from app.logging.routes import blp as logging_blp
     from app.media.routes import blp as media_blp
@@ -95,5 +112,6 @@ def _register_blueprints(api: Api):
         caregiver_blp,
         billing_blp,
         push_blp,
+        events_blp,
     ):
         api.register_blueprint(blp)

@@ -6,13 +6,13 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
 
 from app.accounts.models import User
-from app.notifications.models import AlertLog
 from app.billing.service import is_premium
-from app.extensions import db
+from app.events.service import track
+from app.extensions import db, limiter, user_or_ip
 from app.logging.chat_history import get_chat_history
 from app.logging.extraction.pipeline import process_message
 from app.logging.models import ChatMessage, LogEntry
-from app.logging.registry import sanitize_payload, validate_payload
+from app.logging.registry import get_type_catalog, sanitize_payload, validate_payload
 from app.logging.schemas import (
     ChatHistoryQuerySchema,
     ChatHistorySchema,
@@ -21,13 +21,40 @@ from app.logging.schemas import (
     LogbookQuerySchema,
     LogEntrySchema,
     LogEntryUpdateSchema,
+    LogTypeSchema,
 )
+from app.notifications.models import AlertLog
 
 blp = Blueprint("logging", __name__, url_prefix="/api/v1", description="Chat logging & logbook")
 
 
+@blp.route("/log-types")
+class LogTypes(MethodView):
+    """The type catalog the extractor works from, for the app's typed
+    correction sheet — so a wrong calorie estimate can be fixed as a number
+    and an enum as a choice, never as free text."""
+
+    @jwt_required()
+    @blp.response(200, LogTypeSchema(many=True))
+    def get(self):
+        return [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "fields": [
+                    {"name": name, "type": spec["type"], "required": bool(spec.get("required")), "enum": spec.get("enum")}
+                    for name, spec in t["schema"].items()
+                ],
+            }
+            for t in get_type_catalog()
+        ]
+
+
 @blp.route("/chat/messages")
 class ChatMessages(MethodView):
+    # Every message is an LLM call; this is the cost ceiling per user.
+    decorators = [limiter.limit("60/minute;600/day", methods=["POST"], key_func=user_or_ip)]
+
     @jwt_required()
     @blp.arguments(ChatHistoryQuerySchema, location="query")
     @blp.response(200, ChatHistorySchema)
@@ -110,6 +137,12 @@ class LogEntryDetail(MethodView):
             setattr(entry, key, value)
         db.session.commit()
         _recompute(user_id, entry.timestamp)
+        track(
+            "entry_corrected",
+            user_id,
+            type=entry.type,
+            fields_changed=sorted(k for k in ("summary", "raw_text", "structured_payload") if k in data),
+        )
         return entry
 
     @jwt_required()
@@ -120,11 +153,13 @@ class LogEntryDetail(MethodView):
         entry_timestamp = entry.timestamp
         # The chat card for this entry goes with it; alerts it raised stay as
         # a safety record, just no longer pointing at a row that's gone.
+        entry_type = entry.type
         ChatMessage.query.filter_by(log_entry_id=entry.id).delete()
         AlertLog.query.filter_by(log_entry_id=entry.id).update({"log_entry_id": None})
         db.session.delete(entry)
         db.session.commit()
         _recompute(user_id, entry_timestamp)
+        track("entry_deleted", user_id, type=entry_type)
 
 
 def _recompute(user_id: str, timestamp_utc) -> None:

@@ -1,12 +1,15 @@
+import time
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 
 from app.accounts.models import User
 from app.common.llm import get_llm_provider
+from app.common.llm.base import ExtractionResult
 from app.common.llm.mock_provider import MockProvider
 from app.common.localtime import local_date_of, local_now, to_local, to_utc, user_tz_offset
 from app.common.models import utcnow
+from app.events.service import record_llm_call, track
 from app.extensions import db
 from app.logging.models import ChatMessage, LogEntry
 from app.logging.registry import get_type, get_type_catalog, sanitize_payload, validate_payload
@@ -14,27 +17,47 @@ from app.media.models import MediaAsset
 from app.media.storage import download_bytes
 
 
-def _extract_with_fallback(text: str, image_bytes: bytes | None, image_mime_type: str | None, now_local: datetime):
+def _extract_with_fallback(
+    user_id: str, text: str, image_bytes: bytes | None, image_mime_type: str | None, now_local: datetime
+) -> tuple[ExtractionResult, bool]:
     """Run the configured provider, falling back to the offline keyword
-    extractor if it errors.
+    extractor if it errors. Returns (result, degraded).
 
     The free Gemini tier allows only 15 requests/minute and 500/day, so
     hitting a limit mid-day is a realistic Tuesday — and losing what someone
     just told us because of that would be the worst possible failure. A
-    degraded entry beats no entry.
+    degraded entry beats no entry — but the response says it was degraded,
+    so the app can ask the user to check the card.
+
+    Every call, successful or not, lands in llm_calls with its latency.
     """
     provider = get_llm_provider()
+    started = time.perf_counter()
     try:
-        return provider.extract(
+        result = provider.extract(
             text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
         )
     except Exception:
-        current_app.logger.exception("LLM extraction failed; falling back to the offline extractor")
+        latency_ms = round((time.perf_counter() - started) * 1000)
+        current_app.logger.exception("LLM extraction failed after %sms; falling back to the offline extractor", latency_ms)
+        record_llm_call(
+            purpose="extract", provider=provider.name, model=provider.model_name, latency_ms=latency_ms,
+            user_id=user_id, input_chars=len(text or ""), has_media=image_bytes is not None, failed=True, commit=False,
+        )
         if isinstance(provider, MockProvider):
             raise  # nothing left to fall back to
-        return MockProvider().extract(
+        result = MockProvider().extract(
             text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
         )
+        return result, True
+
+    record_llm_call(
+        purpose="extract", provider=provider.name, model=provider.model_name,
+        latency_ms=round((time.perf_counter() - started) * 1000), user_id=user_id,
+        input_chars=len(text or ""), has_media=image_bytes is not None,
+        output_entries=len(result.entries), usage=result.usage, commit=False,
+    )
+    return result, False
 
 
 def _timestamp_for(extracted, now_local: datetime, tz_offset: int) -> datetime | None:
@@ -92,7 +115,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
 
     tz_offset = user_tz_offset(user)
     now_local = local_now(tz_offset)
-    result = _extract_with_fallback(text, image_bytes, image_mime_type, now_local)
+    result, degraded = _extract_with_fallback(user.id, text, image_bytes, image_mime_type, now_local)
 
     created_entries: list[LogEntry] = []
     all_alerts = []
@@ -136,6 +159,19 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
     db.session.flush()  # assign ids to alerts before the transcript rows reference them
     _record_chat_transcript(user, text, media_asset_id, created_entries, all_alerts, result.reply)
 
+    track(
+        "extraction_result",
+        user.id,
+        commit=False,
+        entries=len(created_entries),
+        types=sorted({e.type for e in created_entries}),
+        alerts=len(all_alerts),
+        dropped=len(result.entries) - len(created_entries),
+        validation_errors=len(validation_errors),
+        has_photo=image_bytes is not None,
+        degraded=degraded,
+        chars=len(text or ""),
+    )
     db.session.commit()
 
     if touched_dates:
@@ -150,6 +186,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         "alerts": [a.to_dict() for a in all_alerts],
         "reply": result.reply,
         "validation_errors": validation_errors,
+        "degraded": degraded,
     }
 
 

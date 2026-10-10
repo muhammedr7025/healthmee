@@ -1,14 +1,29 @@
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 
 from app.accounts.models import User
 from app.analytics.models import DailyAggregate
-from app.common.localtime import local_day_bounds_utc
+from app.common.localtime import local_day_bounds_utc, local_today
 from app.extensions import celery, db
 from app.logging.models import LogEntry
+
+
+@celery.task(name="analytics.reconcile_recent_days")
+def reconcile_recent_days() -> None:
+    """Safety net under the inline recompute: redo today and yesterday for
+    everyone who logged in the last two days, so a failed inline pass can't
+    leave a stale total for more than a few hours."""
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=2)
+    user_ids = [row[0] for row in db.session.query(LogEntry.user_id).filter(LogEntry.timestamp >= since).distinct().all()]
+    for user_id in user_ids:
+        user = User.query.get(user_id)
+        offset = (user.tz_offset_minutes if user else 0) or 0
+        today = local_today(offset)
+        recompute_days(user_id, [today, today - timedelta(days=1)], offset)
+    current_app.logger.info("reconciled daily aggregates for %d users", len(user_ids))
 
 
 def recompute_days(user_id: str, days: Iterable[date], tz_offset_minutes: int | None) -> None:

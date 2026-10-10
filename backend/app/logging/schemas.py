@@ -22,9 +22,25 @@ class LogEntryUpdateSchema(Schema):
     structured_payload = fields.Dict(required=False, attribute="structured_payload", data_key="payload")
 
 
+class LogTypeFieldSchema(Schema):
+    name = fields.String(dump_only=True)
+    type = fields.String(dump_only=True)  # str|number|bool|list[str]|list[number]|dict
+    required = fields.Boolean(dump_only=True)
+    enum = fields.List(fields.String(), dump_only=True, allow_none=True)
+
+
+class LogTypeSchema(Schema):
+    name = fields.String(dump_only=True)
+    description = fields.String(dump_only=True)
+    fields = fields.List(fields.Nested(LogTypeFieldSchema), dump_only=True)
+
+
 class ChatResponseSchema(Schema):
     entries = fields.List(fields.Dict(), dump_only=True)
     alerts = fields.List(fields.Dict(), dump_only=True)
+    # True when the real model failed and the offline extractor logged this
+    # turn instead — the app asks the user to glance at the card.
+    degraded = fields.Boolean(dump_only=True)
     reply = fields.String(dump_only=True)
     validation_errors = fields.List(fields.String(), dump_only=True)
 

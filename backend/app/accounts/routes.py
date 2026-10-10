@@ -1,3 +1,4 @@
+from flask import current_app
 from flask.views import MethodView
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required
 from flask_smorest import Blueprint, abort
@@ -24,13 +25,16 @@ def _tokens(user: User) -> dict:
     }
 from app.common.email_service import send as send_email
 from app.common.models import utcnow
-from app.extensions import db
+from app.events.service import track
+from app.extensions import db, limiter
 
 blp = Blueprint("accounts", __name__, url_prefix="/api/v1/auth", description="Registration & login")
 
 
 @blp.route("/register")
 class Register(MethodView):
+    decorators = [limiter.limit("5/minute;30/hour")]
+
     @blp.arguments(RegisterSchema)
     @blp.response(201, TokenSchema)
     def post(self, data):
@@ -42,11 +46,16 @@ class Register(MethodView):
         db.session.add(user)
         db.session.commit()
 
+        track("signup", user.id, has_name=bool(data.get("full_name")))
         return _tokens(user)
 
 
 @blp.route("/login")
 class Login(MethodView):
+    # Per IP: slows credential stuffing without locking a real user out of
+    # their own account.
+    decorators = [limiter.limit("10/minute;100/hour")]
+
     @blp.arguments(LoginSchema)
     @blp.response(200, TokenSchema)
     def post(self, data):
@@ -54,6 +63,7 @@ class Login(MethodView):
         if user is None or not user.check_password(data["password"]):
             abort(401, message="Invalid email or password.")
 
+        track("login", user.id)
         return _tokens(user)
 
 
@@ -96,6 +106,10 @@ class MeExport(MethodView):
 
 @blp.route("/password/reset-request")
 class PasswordResetRequest(MethodView):
+    # Each request issues a fresh code and resets the guess counter, so the
+    # request itself has to be scarce.
+    decorators = [limiter.limit("3/hour;10/day")]
+
     @blp.arguments(PasswordResetRequestSchema)
     @blp.response(202)
     def post(self, data):
@@ -110,16 +124,23 @@ class PasswordResetRequest(MethodView):
             token, raw_code = PasswordResetToken.issue(user.id)
             db.session.add(token)
             db.session.commit()
-            send_email(
-                user.email,
-                "Your Health MEE password reset code",
-                f"Your code is {raw_code}. It works once and expires in 30 minutes.\n\n"
-                "If you didn't request this, you can ignore this email.",
-            )
+            try:
+                send_email(
+                    user.email,
+                    "Your Health MEE password reset code",
+                    f"Your code is {raw_code}. It works once and expires in 30 minutes.\n\n"
+                    "If you didn't request this, you can ignore this email.",
+                )
+            except Exception:
+                # A mail outage must look identical to an unknown address, or
+                # the error reveals which emails have accounts.
+                current_app.logger.exception("password reset email failed")
 
 
 @blp.route("/password/reset-confirm")
 class PasswordResetConfirm(MethodView):
+    decorators = [limiter.limit("10/15minutes")]
+
     @blp.arguments(PasswordResetConfirmSchema)
     @blp.response(204)
     def post(self, data):

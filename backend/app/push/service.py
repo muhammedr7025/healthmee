@@ -29,19 +29,26 @@ def send(user_id: str, kind: str, title: str, body: str, dedupe_key: str) -> Pus
     mode = _mode()
     log = PushLog(user_id=user_id, kind=kind, title=title, body=body, delivery_mode=mode, dedupe_key=dedupe_key)
 
+    delivered = 0
     if mode == "fcm":
-        tokens = [t.token for t in DeviceToken.query.filter_by(user_id=user_id).all()]
+        tokens = DeviceToken.query.filter_by(user_id=user_id).all()
         if tokens:
-            _send_fcm(tokens, title, body)
+            delivered = _send_fcm(tokens, title, body)
         # No registered device is not an error — the log row still records
         # that the reminder logic fired; it just had nowhere to deliver to.
 
     db.session.add(log)
     db.session.commit()
+
+    from app.events.service import track
+
+    track("push_sent", user_id, kind=kind, mode=mode, delivered=delivered)
     return log
 
 
-def _send_fcm(tokens: list[str], title: str, body: str) -> None:
+def _send_fcm(tokens: list[DeviceToken], title: str, body: str) -> int:
+    """Returns how many devices accepted the message. Tokens FCM reports as
+    gone are removed so they stop costing a failed send every time."""
     import firebase_admin
     from firebase_admin import credentials, messaging
 
@@ -49,8 +56,14 @@ def _send_fcm(tokens: list[str], title: str, body: str) -> None:
         cred = credentials.Certificate(current_app.config["FCM_CREDENTIALS_JSON"])
         firebase_admin.initialize_app(cred)
 
-    for token in tokens:
+    delivered = 0
+    for device in tokens:
         try:
-            messaging.send(messaging.Message(notification=messaging.Notification(title=title, body=body), token=token))
+            messaging.send(messaging.Message(notification=messaging.Notification(title=title, body=body), token=device.token))
+            delivered += 1
+        except messaging.UnregisteredError:
+            current_app.logger.info("pruning unregistered push token for device %s", device.id)
+            db.session.delete(device)
         except Exception:
-            continue  # a dead/unregistered token shouldn't block the rest
+            current_app.logger.exception("push send failed for device %s", device.id)
+    return delivered

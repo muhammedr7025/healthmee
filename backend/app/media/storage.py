@@ -72,9 +72,24 @@ def upload_bytes(key: str, data: bytes, content_type: str) -> None:
     _client().put_object(Bucket=current_app.config["S3_BUCKET"], Key=key, Body=data, ContentType=content_type)
 
 
-def download_bytes(storage_key: str) -> bytes:
+class MediaTooLarge(ValueError):
+    def __init__(self, size: int, limit: int):
+        super().__init__(f"object is {size} bytes; limit is {limit}")
+        self.size = size
+        self.limit = limit
+
+
+def download_bytes(storage_key: str, max_bytes: int | None = None) -> bytes:
     """Server-side read of an already-uploaded asset — used to hand an
-    uploaded photo to a vision-capable LLM provider.
+    uploaded photo or PDF to a vision-capable LLM provider. Checks the size
+    first: the whole object is base64'd into a model request, so a 200 MB
+    upload must be refused, not loaded.
     """
-    obj = _client().get_object(Bucket=current_app.config["S3_BUCKET"], Key=storage_key)
+    limit = max_bytes or current_app.config.get("MAX_MEDIA_BYTES", 15 * 1024 * 1024)
+    client = _client()
+    bucket = current_app.config["S3_BUCKET"]
+    size = client.head_object(Bucket=bucket, Key=storage_key).get("ContentLength", 0)
+    if size > limit:
+        raise MediaTooLarge(size, limit)
+    obj = client.get_object(Bucket=bucket, Key=storage_key)
     return obj["Body"].read()

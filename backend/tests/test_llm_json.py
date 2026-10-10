@@ -48,7 +48,7 @@ class _FakeModel:
         _FakeGenai.last_generation_config = generation_config
         self._reply = _FakeGenai.next_reply
 
-    def generate_content(self, content):
+    def generate_content(self, content, **kwargs):  # request_options etc., like the real SDK
         return _FakeResponse(self._reply)
 
 
@@ -101,7 +101,7 @@ class _FakeModelSequence:
     def __init__(self, name, system_instruction=None, generation_config=None):
         _FakeGenaiSequence.last_generation_config = generation_config
 
-    def generate_content(self, content):
+    def generate_content(self, content, **kwargs):  # request_options etc., like the real SDK
         reply = _FakeGenaiSequence.replies[_FakeGenaiSequence.calls]
         _FakeGenaiSequence.calls += 1
         return _FakeResponse(reply)

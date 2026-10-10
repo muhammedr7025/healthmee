@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime, time, timedelta
 
 from flask.views import MethodView
@@ -6,7 +7,8 @@ from flask_smorest import Blueprint
 
 from app.accounts.models import User
 from app.analytics.models import DailyAggregate
-from app.extensions import db
+from app.events.service import track
+from app.extensions import db, limiter, user_or_ip
 from app.logging.models import LogEntry
 from app.media.storage import presign_download, upload_bytes
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
@@ -39,6 +41,9 @@ class Reports(MethodView):
 
 @blp.route("/generate")
 class GenerateReport(MethodView):
+    # PDF generation + an S3 upload per call: scarce by design.
+    decorators = [limiter.limit("10/hour", key_func=user_or_ip)]
+
     @jwt_required()
     @blp.arguments(GenerateReportRequestSchema)
     @blp.response(201, GeneratedReportWithUrlSchema)
@@ -48,6 +53,12 @@ class GenerateReport(MethodView):
 
         end = data.get("end") or date.today()
         start = data.get("start") or (end - timedelta(days=30))
+        if start > end:
+            from flask_smorest import abort
+
+            abort(422, message="The report's start date is after its end date.")
+        if (end - start).days > 366:
+            start = end - timedelta(days=366)
         day_start = datetime.combine(start, time.min)
         day_end = datetime.combine(end, time.max)
 
@@ -89,7 +100,9 @@ class GenerateReport(MethodView):
             daily_aggregates=[a.to_dict() for a in aggregates],
         )
 
-        storage_key = f"reports/{user_id}/{start.isoformat()}_{end.isoformat()}_{date.today().isoformat()}.pdf"
+        # A uuid in the key: two reports for the same range on the same day
+        # used to overwrite each other in the bucket.
+        storage_key = f"reports/{user_id}/{start.isoformat()}_{end.isoformat()}_{uuid.uuid4().hex[:8]}.pdf"
         upload_bytes(storage_key, pdf_bytes, "application/pdf")
 
         report = GeneratedReport(
@@ -97,6 +110,7 @@ class GenerateReport(MethodView):
         )
         db.session.add(report)
         db.session.commit()
+        track("report_generated", user_id, range_days=(end - start).days + 1, pages=page_count, entries=len(entries), labs=len(labs))
 
         return {
             **report.to_dict(),

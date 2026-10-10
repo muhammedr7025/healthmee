@@ -1,3 +1,5 @@
+from flask import current_app
+
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
 from app.common.llm.json_utils import parse_json_loose
 from app.common.llm.lab_report import EMPTY_REPORT, LAB_REPORT_PROMPT, normalise_lab_report
@@ -9,12 +11,17 @@ class GeminiProvider(LLMProvider):
     rather than function calling or a rigid response_schema.
     """
 
-    def __init__(self, api_key: str, model: str):
+    name = "gemini"
+    _request_options = {"timeout": 20}  # class default so test doubles built without __init__ still work
+
+    def __init__(self, api_key: str, model: str, timeout: float = 20.0):
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
         self._genai = genai
         self._model_name = model
+        self.model_name = model
+        self._request_options = {"timeout": timeout}
 
     def extract(
         self,
@@ -58,15 +65,17 @@ class GeminiProvider(LLMProvider):
         # so the pipeline falls back to the offline extractor without
         # spending a second request against a wall.
         try:
-            response = model.generate_content(content)
+            response = model.generate_content(content, request_options=self._request_options)
             data = parse_json_loose(response.text)
         except (ValueError, TypeError) as first_error:
             try:
-                response = model.generate_content(content)
+                response = model.generate_content(content, request_options=self._request_options)
                 data = parse_json_loose(response.text)
             except (ValueError, TypeError):
                 raise first_error
 
+        if not isinstance(data, dict):
+            data = {}
         entries = [
             ExtractedEntry(
                 type=e["type"],
@@ -77,7 +86,7 @@ class GeminiProvider(LLMProvider):
             for e in (data.get("entries") or [])
             if isinstance(e, dict) and e.get("type") in type_names
         ]
-        return ExtractionResult(entries=entries, reply=data.get("reply", ""))
+        return ExtractionResult(entries=entries, reply=data.get("reply", ""), usage=_usage(response))
 
     def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
         """Photos and PDFs alike — Gemini takes application/pdf inline, so a
@@ -87,9 +96,13 @@ class GeminiProvider(LLMProvider):
                 self._model_name,
                 generation_config={"response_mime_type": "application/json", "temperature": 0},
             )
-            response = model.generate_content(_content(LAB_REPORT_PROMPT, file_bytes, mime_type))
+            response = model.generate_content(
+                _content(LAB_REPORT_PROMPT, file_bytes, mime_type), request_options={"timeout": 45}
+            )
+            self.last_usage = _usage(response)
             return normalise_lab_report(parse_json_loose(response.text))
         except Exception:
+            current_app.logger.exception("gemini lab report read failed")
             return dict(EMPTY_REPORT)
 
     def narrate(self, prompt: str, stats: dict) -> str:
@@ -99,11 +112,23 @@ class GeminiProvider(LLMProvider):
                 system_instruction="You are MeMe, a warm, non-clinical health journal companion. Write 2-4 "
                 "short sentences, plain prose, no markdown, no diagnosis language.",
             )
-            response = model.generate_content(prompt)
+            response = model.generate_content(prompt, request_options=self._request_options)
+            self.last_usage = _usage(response)
             text = (response.text or "").strip()
             return text or super().narrate(prompt, stats)
         except Exception:
+            current_app.logger.exception("gemini narrate failed; using the deterministic summary")
             return super().narrate(prompt, stats)
+
+
+def _usage(response) -> dict | None:
+    meta = getattr(response, "usage_metadata", None)
+    if meta is None:
+        return None
+    return {
+        "input_tokens": getattr(meta, "prompt_token_count", None),
+        "output_tokens": getattr(meta, "candidates_token_count", None),
+    }
 
 
 def _content(text: str, image_bytes: bytes | None, image_mime_type: str | None):

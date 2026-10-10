@@ -9,11 +9,14 @@ and never invent a number.
 
 import hashlib
 import json
+import time
 from datetime import date, timedelta
 
 from app.analytics.models import DailyAggregate, NarrativeCache
 from app.analytics.targets import ACTIVITY_GOAL_MINUTES_PER_WEEK, WATER_GOAL_ML
 from app.common.llm import get_llm_provider
+from app.common.llm.narrative_fallback import default_narrative
+from app.events.service import record_llm_call, track
 from app.extensions import db
 
 PERIODS = {
@@ -42,7 +45,11 @@ def build_period_narrative(
     stats = _compute_stats(days, start, end)
     previous = _compute_stats(previous_days, previous_start, previous_end)
     deltas = _deltas(stats, previous)
-    summary = _narrate_cached(user_id, period, stats)
+    summary, cache_hit = _narrate_cached(user_id, period, stats)
+    risks = _risks(stats)
+    recommendations = _recommendations(stats, deltas)
+
+    track("narrative_viewed", user_id, period=period, cache_hit=cache_hit, risks=len(risks), recommendations=len(recommendations))
 
     return {
         "period": period,
@@ -56,8 +63,8 @@ def build_period_narrative(
         "wins": _wins(stats),
         "watch": _watch(stats),
         "achievements": _achievements(stats),
-        "risks": _risks(stats),
-        "recommendations": _recommendations(stats, deltas),
+        "risks": risks,
+        "recommendations": recommendations,
     }
 
 
@@ -73,14 +80,17 @@ def _days_between(user_id: str, start: date, end: date) -> list[DailyAggregate]:
     )
 
 
-def _narrate_cached(user_id: str, period: str, stats: dict) -> str:
+def _narrate_cached(user_id: str, period: str, stats: dict) -> tuple[str, bool]:
     """Reuse a previous summary while the underlying numbers are unchanged.
+    Returns (summary, cache_hit).
 
     Opening the Trends tab refetches this, and on the free Gemini tier
     (500 requests/day) regenerating identical prose every time someone taps
     between tabs would burn the daily quota for nothing. Keying the cache on
     a hash of the stats means it refreshes exactly when there's something new
-    to say, with no staleness window to tune.
+    to say, with no staleness window to tune. A call that fell back to the
+    deterministic text is *not* cached, so the next visit tries the model
+    again rather than pinning the fallback until the numbers move.
     """
     fingerprint = hashlib.sha256(
         json.dumps({"period": period, **stats}, sort_keys=True, default=str).encode()
@@ -88,17 +98,31 @@ def _narrate_cached(user_id: str, period: str, stats: dict) -> str:
 
     cached = NarrativeCache.query.filter_by(user_id=user_id, period=period).first()
     if cached is not None and cached.stats_fingerprint == fingerprint:
-        return cached.summary
+        return cached.summary, True
 
-    summary = get_llm_provider().narrate(_build_prompt(stats), stats)
+    provider = get_llm_provider()
+    started = time.perf_counter()
+    summary = provider.narrate(_build_prompt(stats), stats)
+    fell_back = provider.name != "mock" and summary == default_narrative(stats)
+    record_llm_call(
+        purpose="narrate",
+        provider=provider.name,
+        model=provider.model_name,
+        latency_ms=round((time.perf_counter() - started) * 1000),
+        user_id=user_id,
+        fell_back=fell_back,
+        usage=getattr(provider, "last_usage", None),
+        commit=False,
+    )
 
-    if cached is None:
-        cached = NarrativeCache(user_id=user_id, period=period)
-        db.session.add(cached)
-    cached.stats_fingerprint = fingerprint
-    cached.summary = summary
+    if not fell_back:
+        if cached is None:
+            cached = NarrativeCache(user_id=user_id, period=period)
+            db.session.add(cached)
+        cached.stats_fingerprint = fingerprint
+        cached.summary = summary
     db.session.commit()
-    return summary
+    return summary, False
 
 
 def _mean(values: list[float]) -> float | None:
@@ -199,6 +223,8 @@ def _build_prompt(stats: dict) -> str:
             if stats["avg_systolic"] is not None and stats["avg_diastolic"] is not None
             else ""
         )
+        + (f"Blood sugar averaged {stats['avg_glucose_mg_dl']:.0f} mg/dL. " if stats["avg_glucose_mg_dl"] is not None else "")
+        + (f"Resting heart rate averaged {stats['avg_heart_rate_bpm']:.0f} bpm. " if stats["avg_heart_rate_bpm"] is not None else "")
         + "Do not diagnose or give medical advice — just reflect the pattern back to them."
     )
 

@@ -17,6 +17,8 @@ class ExtractedEntry:
 class ExtractionResult:
     entries: list[ExtractedEntry]
     reply: str
+    # Filled by real providers when the API reports it; feeds the LLM call log.
+    usage: dict | None = None
 
 
 class LLMProvider(ABC):
@@ -24,6 +26,12 @@ class LLMProvider(ABC):
     message into zero or more typed entries plus a conversational reply,
     using the registered log-type catalog to know what fields to look for.
     """
+
+    name = "mock"
+    model_name: str | None = None
+    # Token usage of the most recent non-extraction call (narrate, lab
+    # report), when the API reported it.
+    last_usage: dict | None = None
 
     @abstractmethod
     def extract(

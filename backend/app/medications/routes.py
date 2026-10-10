@@ -5,6 +5,7 @@ from flask_smorest import Blueprint, abort
 from app.accounts.models import User
 from app.common.localtime import local_today, user_tz_offset
 from app.common.models import utcnow
+from app.events.service import track
 from app.extensions import db
 from app.medications.models import MedicationDose, MedicationSchedule
 from app.medications.schemas import (
@@ -41,6 +42,7 @@ class Medications(MethodView):
         schedule.times = sorted(set(schedule.times))
         db.session.add(schedule)
         db.session.commit()
+        track("medication_added", schedule.user_id, slots=len(schedule.times), weekly=schedule.days_of_week is not None, has_dose=bool(schedule.dose))
         return schedule
 
 
@@ -110,4 +112,5 @@ class MedicationDoses(MethodView):
             mark.status = data["status"]
             mark.marked_at = utcnow()
         db.session.commit()
+        track("dose_marked", user.id, status=data["status"], same_day=day == _today(user))
         return day_plan(user.id, day)
