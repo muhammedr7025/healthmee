@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:health_ui/health_ui.dart';
 
+import 'auth_errors.dart';
 import 'social_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await widget.onSignIn(_emailController.text.trim(), _passwordController.text);
     } catch (e) {
-      setState(() => _error = 'Something went wrong — please check your details and try again.');
+      setState(() => _error = authErrorMessage(e, fallback: 'Something went wrong — please check your details and try again.'));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -60,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Center(
                 child: Column(
                   children: [
-                    const MascotHalo(state: MascotState.love, size: 140),
+                    const MascotHalo(state: MascotState.love, size: 120),
                     const SizedBox(height: 4),
                     Text('I missed you', style: HealthTypography.display(fontSize: 26)),
                     const SizedBox(height: 8),

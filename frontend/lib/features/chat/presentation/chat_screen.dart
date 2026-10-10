@@ -78,26 +78,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       onTap: () => FocusScope.of(context).unfocus(),
                       child: const _EmptyState(),
                     )
-                  : ListView(
+                  // Lazy: history restores up to a few hundred bubbles on
+                  // launch, and the thread rebuilds every time the typing
+                  // indicator toggles — building only what's on screen keeps
+                  // that cheap. Slot 0 is the day label, the last slot is the
+                  // typing bubble.
+                  : ListView.builder(
                       controller: _scrollController,
                       // Swiping the thread dismisses the keyboard — the main
                       // way back out to the nav bar while typing.
                       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.sm, HealthSpacing.md, HealthSpacing.sm),
-                      children: [
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
-                            child: Text('TODAY', style: HealthTypography.label()),
-                          ),
-                        ),
-                        for (final item in chatState.items)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: HealthSpacing.sm + 4),
-                            child: _ThreadItemView(item: item),
-                          ),
-                        if (chatState.isThinking) const _TypingBubble(),
-                      ],
+                      itemCount: chatState.items.length + 2,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
+                              child: Text('TODAY', style: HealthTypography.label()),
+                            ),
+                          );
+                        }
+                        if (index == chatState.items.length + 1) {
+                          return chatState.isThinking ? const _TypingBubble() : const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: HealthSpacing.sm + 4),
+                          child: _ThreadItemView(item: chatState.items[index - 1]),
+                        );
+                      },
                     ),
             ),
             _QuickRepliesAndInput(controller: _textController, onSend: _send),

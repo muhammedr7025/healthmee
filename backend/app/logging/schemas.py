@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 
 class ChatMessageSchema(Schema):
@@ -30,7 +30,10 @@ class ChatResponseSchema(Schema):
 
 
 class ChatHistoryQuerySchema(Schema):
-    limit = fields.Integer(required=False, load_default=200)
+    # Bounded: history is unbounded now that it persists, and each photo row
+    # costs a presigned-URL signing call — an unbounded limit was a cheap way
+    # to make the API do an arbitrary amount of work.
+    limit = fields.Integer(required=False, load_default=200, validate=validate.Range(min=1, max=500))
 
 
 class ChatHistorySchema(Schema):
@@ -42,5 +45,5 @@ class LogbookQuerySchema(Schema):
     type = fields.String(required=False, allow_none=True)
     start = fields.DateTime(required=False, allow_none=True)
     end = fields.DateTime(required=False, allow_none=True)
-    page = fields.Integer(required=False, load_default=1)
-    per_page = fields.Integer(required=False, load_default=50)
+    page = fields.Integer(required=False, load_default=1, validate=validate.Range(min=1))
+    per_page = fields.Integer(required=False, load_default=50, validate=validate.Range(min=1, max=200))

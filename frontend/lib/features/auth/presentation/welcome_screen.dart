@@ -29,15 +29,18 @@ class WelcomeScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Stage kept proportional to the mockup's 250/198/190 but
+                // scaled down: the artwork is ~150px, so a 190pt hero was a
+                // ~4x upscale on a 3x screen and visibly blurry.
                 SizedBox(
-                  width: 250,
-                  height: 250,
+                  width: 210,
+                  height: 210,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       Container(
-                        width: 198,
-                        height: 198,
+                        width: 166,
+                        height: 166,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
@@ -45,10 +48,10 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const MemeMascot(state: MascotState.happy, size: 190),
+                      const MemeMascot(state: MascotState.happy, size: 150),
                       Positioned(
-                        left: 8,
-                        top: 34,
+                        left: 0,
+                        top: 24,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
                           decoration: BoxDecoration(

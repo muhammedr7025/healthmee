@@ -27,7 +27,9 @@ final _metrics = [
 ];
 
 final _selectedMetricProvider = StateProvider<String>((ref) => 'calories');
-final _trendsViewProvider = StateProvider.autoDispose<String>((ref) => 'charts'); // charts|read
+// Read is the default: the reflection is the point of the tab, the charts are
+// the supporting detail.
+final _trendsViewProvider = StateProvider.autoDispose<String>((ref) => 'read'); // charts|read
 
 class TrendsScreen extends ConsumerWidget {
   const TrendsScreen({super.key});

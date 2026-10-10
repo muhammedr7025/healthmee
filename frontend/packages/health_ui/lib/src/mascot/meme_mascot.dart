@@ -49,12 +49,16 @@ class _MemeMascotState extends State<MemeMascot> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    // The shipped artwork is only ~150px; anything rendered larger than that
+    // is an upscale. Bicubic (high) smooths that noticeably better than the
+    // default bilinear — the real fix is higher-resolution exports.
     final image = Image.asset(
       'assets/mascot/${_assetNames[widget.state]}.png',
       package: 'health_ui',
       width: widget.size,
       height: widget.size,
       fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
     );
     final sized = SizedBox(width: widget.size, height: widget.size, child: image);
 

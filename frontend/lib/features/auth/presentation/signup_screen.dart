@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:health_ui/health_ui.dart';
 
+import 'auth_errors.dart';
 import 'password_strength.dart';
 import 'social_auth_button.dart';
 
@@ -20,6 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _showPassword = false;
   bool _submitting = false;
   String? _error;
+  bool _emailTaken = false;
 
   @override
   void dispose() {
@@ -32,11 +34,15 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() {
       _submitting = true;
       _error = null;
+      _emailTaken = false;
     });
     try {
       await widget.onCreateAccount(_emailController.text.trim(), _passwordController.text);
     } catch (e) {
-      setState(() => _error = "Couldn't create that account — please check your details and try again.");
+      setState(() {
+        _error = authErrorMessage(e, fallback: "Couldn't create that account — please check your details and try again.");
+        _emailTaken = isEmailTakenError(e);
+      });
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -113,6 +119,14 @@ class _SignupScreenState extends State<SignupScreen> {
               if (_error != null) ...[
                 const SizedBox(height: HealthSpacing.sm),
                 AlertBanner(message: _error!, hard: false),
+                if (_emailTaken)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: widget.onSignIn,
+                      child: Text('Sign in to that account instead', style: HealthTypography.body(fontSize: 13, color: HealthColors.accentPrimary)),
+                    ),
+                  ),
               ],
               const SizedBox(height: HealthSpacing.lg),
               Row(
