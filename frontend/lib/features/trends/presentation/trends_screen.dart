@@ -10,12 +10,19 @@ import '../../today/domain/daily_aggregate.dart';
 import '../data/trends_repository.dart';
 
 class _Metric {
-  const _Metric(this.key, this.label, this.unit, this.get, this.color);
+  const _Metric(this.key, this.label, this.unit, this.get, this.color, {this.medical = false, this.hint});
   final String key;
   final String label;
   final String unit;
   final double? Function(DailyAggregate) get;
   final Color color;
+
+  /// A measured reading (BP, weight…) rather than a daily total: shown over
+  /// two weeks, days without a reading left blank instead of drawn as zero.
+  final bool medical;
+
+  /// What to tell MeMe to get this chart started.
+  final String? hint;
 }
 
 final _metrics = [
@@ -24,6 +31,10 @@ final _metrics = [
   _Metric('activity', 'Activity', 'min', (d) => d.activityMinutes, HealthColors.accentSecondary),
   _Metric('mood', 'Mood', '/5', (d) => d.moodScore, HealthColors.accentTertiary),
   _Metric('water', 'Water', 'L', (d) => d.waterMl / 1000, HealthColors.accentTertiary),
+  _Metric('weight', 'Weight', 'kg', (d) => d.weightKg, HealthColors.inkPrimary, medical: true, hint: '"weight 72 kg"'),
+  _Metric('bp', 'Blood pressure', 'mmHg', (d) => d.systolic, HealthColors.accentPrimaryDark, medical: true, hint: '"BP 120/80"'),
+  _Metric('glucose', 'Blood sugar', 'mg/dL', (d) => d.glucoseMgDl, HealthColors.accentPrimary, medical: true, hint: '"fasting sugar 98"'),
+  _Metric('heart', 'Heart rate', 'bpm', (d) => d.heartRateBpm, HealthColors.accentSecondary, medical: true, hint: '"pulse 68"'),
 ];
 
 final _selectedMetricProvider = StateProvider<String>((ref) => 'calories');
@@ -146,10 +157,22 @@ class _TrendsBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedKey = ref.watch(_selectedMetricProvider);
     final metric = _metrics.firstWhere((m) => m.key == selectedKey);
-    final recentDays = trends.days.length > 7 ? trends.days.sublist(trends.days.length - 7) : trends.days;
+    final window = metric.medical ? 14 : 7;
+    final recentDays = trends.days.length > window ? trends.days.sublist(trends.days.length - window) : trends.days;
     final values = recentDays.map(metric.get).toList();
     final present = values.whereType<double>().toList();
     final delta = present.length >= 2 ? present.last - present.first : 0.0;
+
+    // Blood pressure reads as "sys/dia", not as a single bar height.
+    String? latestReading;
+    if (metric.key == 'bp') {
+      final latest = recentDays.lastWhere((d) => d.systolic != null, orElse: () => recentDays.first);
+      if (latest.systolic != null) {
+        latestReading = latest.diastolic == null
+            ? '${latest.systolic!.round()} mmHg'
+            : '${latest.systolic!.round()}/${latest.diastolic!.round()} mmHg';
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, HealthSpacing.lg),
@@ -171,6 +194,32 @@ class _TrendsBody extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
+        if (metric.medical && present.isEmpty)
+          HealthCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const MemeMascot(state: MascotState.curious, size: 44),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('No ${metric.label.toLowerCase()} readings yet',
+                          style: HealthTypography.body(fontSize: 13.5, weight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tell MeMe ${metric.hint ?? 'a reading'} in chat and it shows up here, day by day.',
+                        style: HealthTypography.body(fontSize: 12.5, color: HealthColors.inkMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
         HealthCard(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -181,7 +230,8 @@ class _TrendsBody extends ConsumerWidget {
                 children: [
                   Text(metric.label, style: HealthTypography.body(fontSize: 13.5, weight: FontWeight.w500)),
                   Text(
-                    delta == 0 ? '—' : '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)} ${metric.unit}',
+                    latestReading ??
+                        (delta == 0 ? '—' : '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)} ${metric.unit}'),
                     style: HealthTypography.body(fontSize: 12, color: HealthColors.accentPrimary),
                   ),
                 ],
@@ -206,9 +256,13 @@ class _TrendsBody extends ConsumerWidget {
                               final i = value.toInt();
                               if (i < 0 || i >= recentDays.length) return const SizedBox.shrink();
                               final date = DateTime.parse(recentDays[i].date);
+                              // Two weeks of readings label by day-of-month; a week by weekday initial.
+                              final label = metric.medical
+                                  ? (i.isEven ? DateFormat('d').format(date) : '')
+                                  : DateFormat('E').format(date).substring(0, 1);
                               return Padding(
                                 padding: const EdgeInsets.only(top: 6),
-                                child: Text(DateFormat('E').format(date).substring(0, 1), style: HealthTypography.label()),
+                                child: Text(label, style: HealthTypography.label()),
                               );
                             },
                           ),
@@ -221,8 +275,9 @@ class _TrendsBody extends ConsumerWidget {
                             barRods: [
                               BarChartRodData(
                                 toY: values[i] ?? 0,
-                                color: metric.color,
-                                width: 18,
+                                // A day with no reading is a gap, not a zero.
+                                color: values[i] == null && metric.medical ? Colors.transparent : metric.color,
+                                width: metric.medical ? 11 : 18,
                                 borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
                               ),
                             ],
@@ -232,6 +287,13 @@ class _TrendsBody extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (metric.medical) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Readings you told MeMe about. Several in one day are averaged (weight keeps the latest).',
+                  style: HealthTypography.body(fontSize: 11, color: HealthColors.inkFaint),
+                ),
+              ],
             ],
           ),
         ),

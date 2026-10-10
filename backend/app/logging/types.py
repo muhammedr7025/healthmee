@@ -91,3 +91,30 @@ def register_builtin_types() -> None:
             handlers=[symptom_disclaimer_handler],
         )
     )
+
+    register_type(
+        LogTypeDefinition(
+            name="vital",
+            description=(
+                "A measured vital sign the user reports: blood pressure, blood glucose/sugar, "
+                "weight, heart rate/pulse, body temperature or SpO2. `value` is the reading "
+                "(the systolic number for blood pressure, with `diastolic` separate); `unit` as "
+                "spoken (mmHg, mg/dL, mmol/L, kg, lb, bpm, °C, °F, %)"
+            ),
+            schema={
+                "kind": {
+                    "type": "str",
+                    "required": True,
+                    "enum": ["blood_pressure", "blood_glucose", "weight", "heart_rate", "temperature", "spo2"],
+                },
+                "value": {"type": "number", "required": True},
+                "diastolic": {"type": "number", "required": False},
+                "unit": {"type": "str", "required": False},
+                "context": {
+                    "type": "str",
+                    "required": False,
+                    "enum": ["fasting", "post_meal", "resting", "after_exercise", "morning", "bedtime"],
+                },
+            },
+        )
+    )

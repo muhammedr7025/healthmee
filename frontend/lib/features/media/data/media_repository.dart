@@ -24,8 +24,16 @@ class MediaRepository {
 
   /// Uploads `bytes` straight to object storage and returns the resulting
   /// media asset id, ready to attach to a chat message or a lab scan.
-  Future<String> uploadPhoto(List<int> bytes, {String contentType = 'image/jpeg'}) async {
-    final presignResp = await _dio.post('/media/presign', data: {'content_type': contentType, 'kind': 'photo'});
+  Future<String> uploadPhoto(List<int> bytes, {String contentType = 'image/jpeg'}) =>
+      _upload(bytes, kind: 'photo', contentType: contentType);
+
+  /// A PDF (lab report from a hospital portal) — same path, different kind so
+  /// the server knows to read it as a document rather than an image.
+  Future<String> uploadDocument(List<int> bytes, {String contentType = 'application/pdf'}) =>
+      _upload(bytes, kind: 'document', contentType: contentType);
+
+  Future<String> _upload(List<int> bytes, {required String kind, required String contentType}) async {
+    final presignResp = await _dio.post('/media/presign', data: {'content_type': contentType, 'kind': kind});
     final presigned = PresignedUpload.fromJson(presignResp.data as Map<String, dynamic>);
 
     // Presigned PUT goes straight to the storage host, not through the API

@@ -99,14 +99,14 @@ class _ProfileTab extends ConsumerWidget {
 
   Future<void> _scanLabReport(BuildContext context, WidgetRef ref) async {
     final results = await runLabScanFlow(context, ref);
-    if (results == null) return; // user cancelled before picking a photo
+    if (results == null) return; // backed out before anything was saved
     ref.invalidate(labResultsProvider);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
         results.isEmpty
-            ? "Couldn't read any values from that photo — try adding them by hand instead."
-            : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the photo.',
+            ? "Couldn't read any values from that report — try adding them by hand instead."
+            : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the report.',
       ),
     ));
   }

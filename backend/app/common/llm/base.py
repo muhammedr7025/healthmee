@@ -44,12 +44,19 @@ class LLMProvider(ABC):
         """
         raise NotImplementedError
 
-    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
-        """OCR lab-report scanning. Default: no capability — mock/text-only
-        providers return nothing rather than inventing lab values. Vision
-        providers override this to return [{test_name, value, unit}, ...].
+    def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
+        """Lab-report reading from a photo or a PDF. Returns
+        {"report_date": "YYYY-MM-DD" | None, "results": [{test_name, value,
+        unit, reference_range}, ...]}. Default: no capability — mock/text-only
+        providers return nothing rather than inventing lab values.
         """
-        return []
+        from app.common.llm.lab_report import EMPTY_REPORT
+
+        return dict(EMPTY_REPORT)
+
+    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
+        """Older callers: just the rows of `read_lab_report`."""
+        return self.read_lab_report(image_bytes, image_mime_type)["results"]
 
     def narrate(self, prompt: str, stats: dict) -> str:
         """Trends "read" summary (VitaChat's period narrative). Default is a

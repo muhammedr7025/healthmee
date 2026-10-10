@@ -7,7 +7,7 @@ class MediaAsset(db.Model, TimestampMixin):
 
     id = db.Column(db.String(36), primary_key=True, default=gen_uuid)
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False, index=True)
-    kind = db.Column(db.String(20), nullable=False)  # photo|video
+    kind = db.Column(db.String(20), nullable=False)  # photo|video|document (PDF)
     storage_key = db.Column(db.String(512), nullable=False)
     content_type = db.Column(db.String(128), nullable=True)
 

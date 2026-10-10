@@ -12,8 +12,10 @@ class LogbookRepository {
   Future<List<LogEntryView>> fetchEntries({String? type, DateTime? start, DateTime? end}) async {
     final params = <String, dynamic>{};
     if (type != null) params['type'] = type;
-    if (start != null) params['start'] = start.toIso8601String();
-    if (end != null) params['end'] = end.toIso8601String();
+    // Sent as UTC with the Z suffix: a local time without an offset would be
+    // read by the server as UTC, shifting "today" by the user's whole offset.
+    if (start != null) params['start'] = start.toUtc().toIso8601String();
+    if (end != null) params['end'] = end.toUtc().toIso8601String();
     final resp = await _dio.get('/logbook', queryParameters: params);
     return (resp.data as List).map((e) => LogEntryView.fromJson(e as Map<String, dynamic>)).toList();
   }

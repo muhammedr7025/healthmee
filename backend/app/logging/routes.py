@@ -51,9 +51,10 @@ class Logbook(MethodView):
         if args.get("type"):
             query = query.filter(LogEntry.type == args["type"])
 
-        start = args.get("start")
-        if start and start.tzinfo:
-            start = start.replace(tzinfo=None)
+        # Timestamps are stored as naive UTC; a client bound like
+        # 2026-10-11T00:00:00+05:30 has to be converted, not just stripped.
+        start = _naive_utc(args.get("start"))
+        end = _naive_utc(args.get("end"))
         if not is_premium(user_id):
             # Free tier: history capped at FREE_TIER_LOGBOOK_DAYS (paywall
             # "Unlimited history instead of 30 days"). Clamp rather than
@@ -64,12 +65,18 @@ class Logbook(MethodView):
             start = max(start, free_tier_cutoff) if start else free_tier_cutoff
         if start:
             query = query.filter(LogEntry.timestamp >= start)
-        if args.get("end"):
-            query = query.filter(LogEntry.timestamp <= args["end"])
+        if end:
+            query = query.filter(LogEntry.timestamp <= end)
 
         query = query.order_by(LogEntry.timestamp.desc())
         page = query.paginate(page=args["page"], per_page=args["per_page"], error_out=False)
         return page.items
+
+
+def _naive_utc(value: datetime | None) -> datetime | None:
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @blp.route("/log-entries/<string:entry_id>")

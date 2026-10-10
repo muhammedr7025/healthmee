@@ -35,6 +35,12 @@ List<MapEntry<String, String>> formatLogRows(String type, Map<String, dynamic> p
     case 'symptom':
       final rows = <MapEntry<String, String>>[MapEntry(s(payload['description']), s(payload['body_area']))];
       return rows;
+    case 'hydration':
+      return [MapEntry(s(payload['beverage'] ?? 'Water'), '${s(payload['volume_ml'])} ml')];
+    case 'vital':
+      final rows = <MapEntry<String, String>>[MapEntry(vitalKindLabel(s(payload['kind'])), formatVitalValue(payload))];
+      if (payload['context'] != null) rows.add(MapEntry('When', s(payload['context']).replaceAll('_', ' ')));
+      return rows;
     default:
       return payload.entries.map((e) => MapEntry(e.key, s(e.value))).toList();
   }
@@ -47,6 +53,34 @@ const _typeLabels = {
   'activity': 'Activity logged',
   'stress': 'Stress logged',
   'symptom': 'Symptom noted',
+  'hydration': 'Water logged',
+  'vital': 'Reading recorded',
 };
 
 String extractCardLabel(String type) => _typeLabels[type] ?? 'Logged';
+
+const _vitalKindLabels = {
+  'blood_pressure': 'Blood pressure',
+  'blood_glucose': 'Blood sugar',
+  'weight': 'Weight',
+  'heart_rate': 'Heart rate',
+  'temperature': 'Temperature',
+  'spo2': 'SpO₂',
+};
+
+String vitalKindLabel(String kind) => _vitalKindLabels[kind] ?? kind;
+
+/// "120/80 mmHg", "110 mg/dL", "72 kg" — the reading the way a person
+/// would say it back.
+String formatVitalValue(Map<String, dynamic> payload) {
+  String n(dynamic v) {
+    if (v is num) return v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    return v?.toString() ?? '';
+  }
+
+  final unit = payload['unit']?.toString();
+  final value = payload['kind'] == 'blood_pressure' && payload['diastolic'] != null
+      ? '${n(payload['value'])}/${n(payload['diastolic'])}'
+      : n(payload['value']);
+  return unit == null || unit.isEmpty ? value : (unit == '%' ? '$value%' : '$value $unit');
+}

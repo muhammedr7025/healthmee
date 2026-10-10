@@ -3,7 +3,9 @@ from marshmallow import Schema, fields, validate
 
 class PresignRequestSchema(Schema):
     content_type = fields.String(required=True)
-    kind = fields.String(required=True, validate=validate.OneOf(["photo", "video"]))
+    # "document" is a PDF (lab reports from a hospital portal); photo/video
+    # are camera captures.
+    kind = fields.String(required=True, validate=validate.OneOf(["photo", "video", "document"]))
 
 
 class PresignResponseSchema(Schema):

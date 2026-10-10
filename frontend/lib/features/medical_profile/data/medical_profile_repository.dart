@@ -55,11 +55,26 @@ class MedicalProfileRepository {
     return (resp.data as List).map((l) => LabResultData.fromJson(l as Map<String, dynamic>)).toList();
   }
 
-  /// OCR scan of a lab-report photo (already-uploaded media asset id).
-  /// Returns whatever the configured vision provider could read — empty in
-  /// mock mode, since there's no real vision to fall back on.
-  Future<List<LabResultData>> scanLabReport(String mediaAssetId) async {
+  /// Reads a lab report (photo or PDF, already uploaded) and returns the
+  /// candidate rows plus the report date — nothing is saved until
+  /// [saveLabResults]. Empty in mock mode, since there's no real vision to
+  /// fall back on.
+  Future<LabScanResult> scanLabReport(String mediaAssetId) async {
     final resp = await _dio.post('/lab-results/scan', data: {'media_asset_id': mediaAssetId});
+    return LabScanResult.fromJson(resp.data as Map<String, dynamic>);
+  }
+
+  /// Saves the rows the user kept from the review sheet, all dated [takenAt].
+  Future<List<LabResultData>> saveLabResults(
+    List<LabCandidate> results, {
+    required DateTime takenAt,
+    String? mediaAssetId,
+  }) async {
+    final resp = await _dio.post('/lab-results/bulk', data: {
+      'taken_at': takenAt.toUtc().toIso8601String(),
+      'media_asset_id': ?mediaAssetId,
+      'results': results.map((r) => r.toJson()).toList(),
+    });
     return (resp.data as List).map((l) => LabResultData.fromJson(l as Map<String, dynamic>)).toList();
   }
 }

@@ -9,6 +9,11 @@ class DailyAggregateSchema(Schema):
     mood_score = fields.Float(dump_only=True, allow_none=True)
     water_ml = fields.Float(dump_only=True)
     log_count = fields.Integer(dump_only=True)
+    weight_kg = fields.Float(dump_only=True, allow_none=True)
+    systolic = fields.Float(dump_only=True, allow_none=True)
+    diastolic = fields.Float(dump_only=True, allow_none=True)
+    glucose_mg_dl = fields.Float(dump_only=True, allow_none=True)
+    heart_rate_bpm = fields.Float(dump_only=True, allow_none=True)
 
 
 class TrendsQuerySchema(Schema):

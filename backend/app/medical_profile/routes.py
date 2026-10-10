@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, timezone
 
 from flask.views import MethodView
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -14,6 +14,8 @@ from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.medical_profile.schemas import (
     AllergySchema,
     LabResultSchema,
+    LabResultsBulkSchema,
+    LabScanResponseSchema,
     MedicalProfileSchema,
     OnboardingSchema,
     ScanLabReportSchema,
@@ -157,41 +159,61 @@ class LabResults(MethodView):
 
 @blp.route("/lab-results/scan")
 class ScanLabReport(MethodView):
-    """OCR lab-report scanning (VitaChat onboarding step 6 / Medical Profile
-    "Snap a new report"). Uses the configured LLM provider's vision path —
-    in mock mode (or against a provider without vision support) this
-    honestly returns zero results rather than inventing lab values.
+    """Reads a lab report — a photo or a PDF — and returns what it found as
+    *candidates*, plus the report date if one was printed. Nothing is saved
+    here: the app shows the rows for the user to untick or correct, then
+    POSTs the keepers to /lab-results/bulk. A misread glucose value is
+    exactly the thing that must not land silently in a medical record. In
+    mock mode (or with a provider that can't see) this honestly returns no
+    candidates rather than inventing lab values.
     """
 
     @jwt_required()
     @blp.arguments(ScanLabReportSchema)
-    @blp.response(201, LabResultSchema(many=True))
+    @blp.response(200, LabScanResponseSchema)
     def post(self, data):
         user_id = get_jwt_identity()
         asset = MediaAsset.query.filter_by(id=data["media_asset_id"], user_id=user_id).first_or_404()
-        if asset.kind != "photo":
-            abort(400, message="Lab report scanning needs a photo, not a video.")
+        if asset.kind not in ("photo", "document"):
+            abort(400, message="Lab report scanning needs a photo or a PDF, not a video.")
 
         try:
-            image_bytes = download_bytes(asset.storage_key)
+            file_bytes = download_bytes(asset.storage_key)
         except Exception:
-            abort(502, message="Couldn't read that photo from storage — please try again.")
+            abort(502, message="Couldn't read that file from storage — please try again.")
 
-        provider = get_llm_provider()
-        found = provider.extract_lab_values(image_bytes, asset.content_type or "image/jpeg")
+        default_mime = "application/pdf" if asset.kind == "document" else "image/jpeg"
+        report = get_llm_provider().read_lab_report(file_bytes, asset.content_type or default_mime)
+        return {
+            "report_date": report.get("report_date"),
+            "media_asset_id": asset.id,
+            "candidates": report.get("results", []),
+        }
 
-        results = []
-        for item in found:
-            lab_result = LabResult(
-                user_id=user_id,
-                source="ocr",
-                test_name=item["test_name"],
-                value=str(item["value"]),
-                unit=item.get("unit"),
-                taken_at=datetime.now(timezone.utc),
-                media_asset_id=asset.id,
-            )
-            db.session.add(lab_result)
-            results.append(lab_result)
+
+@blp.route("/lab-results/bulk")
+class LabResultsBulk(MethodView):
+    """Saves the rows the user kept from a scan's review sheet, all dated
+    with the report's date (or whatever date they picked) rather than the
+    moment they happened to upload it."""
+
+    @jwt_required()
+    @blp.arguments(LabResultsBulkSchema)
+    @blp.response(201, LabResultSchema(many=True))
+    def post(self, data):
+        user_id = get_jwt_identity()
+        taken_at = data["taken_at"]
+        if taken_at.tzinfo is not None:
+            taken_at = taken_at.astimezone(timezone.utc).replace(tzinfo=None)
+
+        media_asset_id = data.get("media_asset_id")
+        if media_asset_id and not MediaAsset.query.filter_by(id=media_asset_id, user_id=user_id).first():
+            abort(404, message="Unknown media asset.")
+
+        results = [
+            LabResult(user_id=user_id, source="ocr", taken_at=taken_at, media_asset_id=media_asset_id, **item)
+            for item in data["results"]
+        ]
+        db.session.add_all(results)
         db.session.commit()
         return results

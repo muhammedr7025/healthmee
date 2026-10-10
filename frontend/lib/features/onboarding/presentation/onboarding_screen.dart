@@ -916,17 +916,17 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
     });
     try {
       final results = await runLabScanFlow(context, ref);
-      if (results == null) return; // cancelled before picking a photo
+      if (results == null) return; // backed out before anything was saved
       if (mounted) {
         setState(() {
           _savedCount += results.length;
           _scanMessage = results.isEmpty
-              ? "Couldn't read any values from that photo — try typing one in below instead."
-              : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the photo.';
+              ? "Couldn't read any values from that report — try typing one in below instead."
+              : 'Added ${results.length} value${results.length == 1 ? '' : 's'} from the report.';
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _scanMessage = "Couldn't scan that photo — please try again.");
+      if (mounted) setState(() => _scanMessage = "Couldn't read that report — please try again.");
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
@@ -940,15 +940,15 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Snap a photo and MeMe will pull out what it can read, or type one value in by hand. '
-            'Either way, you can skip this entirely and add it later from your Medical Profile.',
+            'Snap a photo or upload the PDF your lab sent, and MeMe will pull out what it can read for you '
+            'to check — or type one value in by hand. Either way, you can skip this and add it later from your Medical Profile.',
             style: HealthTypography.body(color: HealthColors.inkMuted),
           ),
           const SizedBox(height: HealthSpacing.md),
           OutlinedButton.icon(
             onPressed: _scanning ? null : _scan,
-            icon: const Icon(Icons.camera_alt_outlined, size: 18),
-            label: Text(_scanning ? 'Scanning…' : 'Scan a lab report photo'),
+            icon: const Icon(Icons.document_scanner_outlined, size: 18),
+            label: Text(_scanning ? 'Reading…' : 'Scan or upload a lab report'),
           ),
           if (_scanMessage != null) ...[
             const SizedBox(height: HealthSpacing.sm),

@@ -12,7 +12,9 @@ import '../domain/log_entry.dart';
 const _typeFilters = [
   (null, 'All'),
   ('food', 'Food'),
+  ('vital', 'Vitals'),
   ('sleep', 'Sleep'),
+  ('hydration', 'Water'),
   ('mood', 'Mood'),
   ('activity', 'Activity'),
   ('stress', 'Stress'),

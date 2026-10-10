@@ -34,6 +34,15 @@ class DailyAggregate(db.Model, TimestampMixin):
     water_ml = db.Column(db.Float, nullable=False, default=0)
     log_count = db.Column(db.Integer, nullable=False, default=0)
 
+    # One number per vital per day, from `vital` log entries — see
+    # analytics/tasks.py for how several readings collapse into one. Null
+    # when nothing was measured that day, so the Trends line can skip it.
+    weight_kg = db.Column(db.Float, nullable=True)
+    systolic = db.Column(db.Float, nullable=True)
+    diastolic = db.Column(db.Float, nullable=True)
+    glucose_mg_dl = db.Column(db.Float, nullable=True)
+    heart_rate_bpm = db.Column(db.Float, nullable=True)
+
     def to_dict(self) -> dict:
         return {
             "date": self.date.isoformat(),
@@ -43,4 +52,9 @@ class DailyAggregate(db.Model, TimestampMixin):
             "mood_score": self.mood_score,
             "water_ml": self.water_ml,
             "log_count": self.log_count,
+            "weight_kg": self.weight_kg,
+            "systolic": self.systolic,
+            "diastolic": self.diastolic,
+            "glucose_mg_dl": self.glucose_mg_dl,
+            "heart_rate_bpm": self.heart_rate_bpm,
         }

@@ -3,6 +3,7 @@ import json
 
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
 from app.common.llm.json_utils import parse_json_loose
+from app.common.llm.lab_report import EMPTY_REPORT, LAB_REPORT_PROMPT, normalise_lab_report
 from app.common.llm.prompting import build_system_prompt, build_tool_schema
 
 
@@ -59,28 +60,16 @@ class OpenAIProvider(LLMProvider):
 
         return ExtractionResult(entries=[], reply="Sorry, I couldn't process that message.")
 
-    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
+    def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": _user_content(
-                            "This is a photo of a lab report. Extract every test result you can read as a "
-                            'JSON array of objects: [{"test_name": str, "value": str, "unit": str or null}]. '
-                            "Return ONLY the JSON array, no other text. If you can't read any values, return [].",
-                            image_bytes,
-                            image_mime_type,
-                        ),
-                    }
-                ],
+                messages=[{"role": "user", "content": _user_content(LAB_REPORT_PROMPT, file_bytes, mime_type)}],
             )
             text = (response.choices[0].message.content or "").strip()
-            data = parse_json_loose(text)
-            return [d for d in data if isinstance(d, dict) and d.get("test_name") and d.get("value")]
+            return normalise_lab_report(parse_json_loose(text))
         except Exception:
-            return []
+            return dict(EMPTY_REPORT)
 
     def narrate(self, prompt: str, stats: dict) -> str:
         try:
@@ -102,11 +91,13 @@ class OpenAIProvider(LLMProvider):
             return super().narrate(prompt, stats)
 
 
-def _user_content(text: str, image_bytes: bytes | None, image_mime_type: str | None):
-    if image_bytes is None:
+def _user_content(text: str, file_bytes: bytes | None, mime_type: str | None):
+    if file_bytes is None:
         return text
-    b64 = base64.b64encode(image_bytes).decode()
-    return [
-        {"type": "text", "text": text},
-        {"type": "image_url", "image_url": {"url": f"data:{image_mime_type or 'image/jpeg'};base64,{b64}"}},
-    ]
+    mime_type = mime_type or "image/jpeg"
+    b64 = base64.b64encode(file_bytes).decode()
+    if mime_type == "application/pdf":
+        attachment = {"type": "file", "file": {"filename": "report.pdf", "file_data": f"data:{mime_type};base64,{b64}"}}
+    else:
+        attachment = {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}}
+    return [{"type": "text", "text": text}, attachment]

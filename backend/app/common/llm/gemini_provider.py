@@ -1,5 +1,6 @@
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
 from app.common.llm.json_utils import parse_json_loose
+from app.common.llm.lab_report import EMPTY_REPORT, LAB_REPORT_PROMPT, normalise_lab_report
 from app.common.llm.prompting import build_system_prompt
 
 
@@ -78,30 +79,18 @@ class GeminiProvider(LLMProvider):
         ]
         return ExtractionResult(entries=entries, reply=data.get("reply", ""))
 
-    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
+    def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
+        """Photos and PDFs alike — Gemini takes application/pdf inline, so a
+        report downloaded from a hospital portal needs no rasterising."""
         try:
             model = self._genai.GenerativeModel(
                 self._model_name,
                 generation_config={"response_mime_type": "application/json", "temperature": 0},
             )
-            content = _content(
-                "This is a photo of a lab report. Read every test result you can and return a JSON "
-                'array of objects: [{"test_name": str, "value": str, "unit": str or null}]. '
-                "Values must be exactly as printed. If you can't read any values, return [].",
-                image_bytes,
-                image_mime_type,
-            )
-            response = model.generate_content(content)
-            data = parse_json_loose(response.text)
-            if isinstance(data, dict):  # some responses wrap the array in a key
-                data = next((v for v in data.values() if isinstance(v, list)), [])
-            return [
-                {"test_name": str(d["test_name"]), "value": str(d["value"]), "unit": d.get("unit")}
-                for d in data
-                if isinstance(d, dict) and d.get("test_name") and d.get("value") is not None
-            ]
+            response = model.generate_content(_content(LAB_REPORT_PROMPT, file_bytes, mime_type))
+            return normalise_lab_report(parse_json_loose(response.text))
         except Exception:
-            return []
+            return dict(EMPTY_REPORT)
 
     def narrate(self, prompt: str, stats: dict) -> str:
         try:

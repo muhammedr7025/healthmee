@@ -3,6 +3,7 @@ import json
 
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
 from app.common.llm.json_utils import parse_json_loose
+from app.common.llm.lab_report import EMPTY_REPORT, LAB_REPORT_PROMPT, normalise_lab_report
 from app.common.llm.prompting import build_system_prompt, build_tool_schema
 
 
@@ -50,23 +51,16 @@ class AnthropicProvider(LLMProvider):
 
         return ExtractionResult(entries=[], reply="Sorry, I couldn't process that message.")
 
-    def extract_lab_values(self, image_bytes: bytes, image_mime_type: str) -> list[dict]:
+    def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
         try:
-            content = _user_content(
-                "This is a photo of a lab report. Extract every test result you can read as a JSON array "
-                'of objects: [{"test_name": str, "value": str, "unit": str or null}]. '
-                "Return ONLY the JSON array, no other text. If you can't read any values, return [].",
-                image_bytes,
-                image_mime_type,
-            )
+            content = _user_content(LAB_REPORT_PROMPT, file_bytes, mime_type)
             response = self._client.messages.create(
-                model=self._model, max_tokens=1024, messages=[{"role": "user", "content": content}]
+                model=self._model, max_tokens=2048, messages=[{"role": "user", "content": content}]
             )
             text = "".join(b.text for b in response.content if b.type == "text").strip()
-            data = parse_json_loose(text)
-            return [d for d in data if isinstance(d, dict) and d.get("test_name") and d.get("value")]
+            return normalise_lab_report(parse_json_loose(text))
         except Exception:
-            return []
+            return dict(EMPTY_REPORT)
 
     def narrate(self, prompt: str, stats: dict) -> str:
         try:
@@ -83,13 +77,16 @@ class AnthropicProvider(LLMProvider):
             return super().narrate(prompt, stats)
 
 
-def _user_content(text: str, image_bytes: bytes | None, image_mime_type: str | None):
-    if image_bytes is None:
+def _user_content(text: str, file_bytes: bytes | None, mime_type: str | None):
+    if file_bytes is None:
         return text
+    mime_type = mime_type or "image/jpeg"
+    # PDFs go in as a document block; everything else is an image.
+    block_type = "document" if mime_type == "application/pdf" else "image"
     return [
         {
-            "type": "image",
-            "source": {"type": "base64", "media_type": image_mime_type or "image/jpeg", "data": base64.b64encode(image_bytes).decode()},
+            "type": block_type,
+            "source": {"type": "base64", "media_type": mime_type, "data": base64.b64encode(file_bytes).decode()},
         },
         {"type": "text", "text": text},
     ]

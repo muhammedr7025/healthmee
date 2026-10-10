@@ -35,6 +35,29 @@ class ScanLabReportSchema(Schema):
     media_asset_id = fields.String(required=True)
 
 
+class LabCandidateSchema(Schema):
+    """One row the reader pulled off a report — not yet a LabResult."""
+
+    test_name = fields.String(required=True, validate=validate.Length(min=1, max=255))
+    value = fields.String(required=True, validate=validate.Length(min=1, max=64))
+    unit = fields.String(required=False, allow_none=True, validate=validate.Length(max=32))
+    reference_range = fields.String(required=False, allow_none=True, validate=validate.Length(max=64))
+
+
+class LabScanResponseSchema(Schema):
+    report_date = fields.String(dump_only=True, allow_none=True)  # YYYY-MM-DD as printed on the report
+    media_asset_id = fields.String(dump_only=True)
+    candidates = fields.List(fields.Nested(LabCandidateSchema), dump_only=True)
+
+
+class LabResultsBulkSchema(Schema):
+    """What the user kept from the review sheet, saved in one go."""
+
+    taken_at = fields.DateTime(required=True)
+    media_asset_id = fields.String(required=False, allow_none=True)
+    results = fields.List(fields.Nested(LabCandidateSchema), required=True, validate=validate.Length(min=1, max=100))
+
+
 class GoalIntakeSchema(Schema):
     type = fields.String(required=True)
     target_value = fields.Dict(required=True)

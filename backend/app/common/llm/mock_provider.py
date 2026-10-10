@@ -33,6 +33,26 @@ _CLOCK_RE = re.compile(r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,
 # Same defaults the LLM prompt is given, so mock and real modes agree.
 _TIME_OF_DAY_HOURS = {"breakfast": 8, "morning": 8, "lunch": 13, "afternoon": 15, "evening": 18, "dinner": 20}
 
+# Vitals. Each wants the number within a short run of non-digits after the
+# cue word, so "weight is 72 kg" matches but "2 spoons of sugar" doesn't.
+_BP_RE = re.compile(r"(?:\bbp\b|blood pressure|pressure)\D{0,12}?(\d{2,3})\s*(?:/|over)\s*(\d{2,3})|\b(\d{2,3})\s*/\s*(\d{2,3})\b")
+_GLUCOSE_RE = re.compile(r"(?:blood sugar|sugar|glucose|\bfbs\b|\bppbs\b|\brbs\b)\D{0,15}?(\d{1,3}(?:\.\d+)?)")
+# "after lunch", "before dinner": the meal is a time marker, not something eaten.
+_MEAL_AS_TIME_RE = re.compile(r"\b(?:after|before|post|pre|since|until|till)\s+(?:my\s+)?(?:breakfast|lunch|dinner|meals?|food|eating)\b")
+_WEIGHT_RE = re.compile(r"(?:weight|weigh(?:ed|s|ing)?)\D{0,12}?(\d{2,3}(?:\.\d+)?)\s*(kgs?|kilos?|lbs?|pounds?)?")
+_HR_RE = re.compile(r"(?:heart ?rate|pulse|\bhr\b)\D{0,12}?(\d{2,3})")
+_SPO2_RE = re.compile(r"(?:spo2|oxygen(?: saturation| level)?|\bo2\b)\D{0,12}?(\d{2,3})")
+_TEMP_RE = re.compile(r"(?:temperature|\btemp\b|fever)\D{0,12}?(\d{2,3}(?:\.\d)?)")
+_POST_MEAL_RE = re.compile(r"after (?:food|eating|a meal|meals?|lunch|dinner|breakfast)|post[- ]?meal|post[- ]?prandial|\bpp\b")
+_VITAL_UNITS = {
+    "blood_pressure": "mmHg",
+    "blood_glucose": "mg/dL",
+    "weight": "kg",
+    "heart_rate": "bpm",
+    "spo2": "%",
+    "temperature": "°C",
+}
+
 
 def _has_word(text: str, word: str) -> bool:
     """Matches at a word start, so "run" still catches "running" but "ate"
@@ -40,6 +60,15 @@ def _has_word(text: str, word: str) -> bool:
     log a phantom meal alongside it.
     """
     return re.search(rf"\b{re.escape(word)}", text) is not None
+
+
+def _describes_eating(lowered: str) -> bool:
+    """Whether the message says something was eaten, as opposed to merely
+    naming a meal as a point in time ("sugar 110 after lunch")."""
+    if any(_has_word(lowered, word) for word in ("ate", "eating", "snack")):
+        return True
+    without_time_markers = _MEAL_AS_TIME_RE.sub(" ", lowered)
+    return any(_has_word(without_time_markers, meal) for meal in ("breakfast", "lunch", "dinner"))
 
 
 class MockProvider(LLMProvider):
@@ -62,10 +91,14 @@ class MockProvider(LLMProvider):
         if hydration is not None:
             entries.append(hydration)
 
-        # A drink-only message ("drank 2 glasses of water") shouldn't also
-        # create a food entry just because "drank"/"had" appears.
+        vitals = self._vitals(lowered)
+        entries.extend(vitals)
+
+        # A drink-only message ("drank 2 glasses of water") or a reading
+        # ("had bp 120/80 this morning", "sugar 6.1 after lunch") shouldn't
+        # also create a food entry just because "drank"/"had"/"lunch" appears.
         logs_food = any(_has_word(lowered, word) for word in FOOD_LEAD_WORDS) and (
-            hydration is None or any(_has_word(lowered, word) for word in SOLID_FOOD_WORDS)
+            (hydration is None and not vitals) or _describes_eating(lowered)
         )
         if logs_food:
             entries.append(
@@ -188,6 +221,74 @@ class MockProvider(LLMProvider):
             payload={"volume_ml": volume_ml, "beverage": beverage},
             summary=f"{volume_ml} ml {beverage}",
         )
+
+    @staticmethod
+    def _vitals(lowered: str) -> list[ExtractedEntry]:
+        """BP, sugar, weight, pulse, SpO2, temperature — the readings people
+        type after a home check or a clinic visit. Sanity ranges keep a date
+        like 10/11 from becoming a blood pressure."""
+        context = None
+        if "fasting" in lowered:
+            context = "fasting"
+        elif _POST_MEAL_RE.search(lowered):
+            context = "post_meal"
+        elif "resting" in lowered:
+            context = "resting"
+        elif _has_word(lowered, "bedtime") or "before bed" in lowered:
+            context = "bedtime"
+        elif _has_word(lowered, "morning"):
+            context = "morning"
+
+        def entry(kind, value, summary, diastolic=None, unit=None):
+            payload = {"kind": kind, "value": value, "unit": unit or _VITAL_UNITS[kind]}
+            if diastolic is not None:
+                payload["diastolic"] = diastolic
+            if context:
+                payload["context"] = context
+            return ExtractedEntry(type="vital", payload=payload, summary=summary)
+
+        found: list[ExtractedEntry] = []
+
+        bp = _BP_RE.search(lowered)
+        if bp:
+            systolic = int(bp.group(1) or bp.group(3))
+            diastolic = int(bp.group(2) or bp.group(4))
+            if 70 <= systolic <= 250 and 40 <= diastolic <= 150:
+                found.append(entry("blood_pressure", systolic, f"BP {systolic}/{diastolic} mmHg", diastolic=diastolic))
+
+        glucose = _GLUCOSE_RE.search(lowered)
+        if glucose:
+            value = float(glucose.group(1))
+            if value < 30:  # only mmol/L reads that low
+                found.append(entry("blood_glucose", value, f"Blood sugar {value:g} mmol/L", unit="mmol/L"))
+            elif value <= 600:
+                suffix = f" ({context.replace('_', ' ')})" if context in ("fasting", "post_meal") else ""
+                found.append(entry("blood_glucose", value, f"Blood sugar {value:g} mg/dL{suffix}"))
+
+        weight = _WEIGHT_RE.search(lowered)
+        if weight:
+            value = float(weight.group(1))
+            unit = "lb" if (weight.group(2) or "").startswith(("lb", "pound")) else "kg"
+            if 20 <= value <= 400:
+                found.append(entry("weight", value, f"Weight {value:g} {unit}", unit=unit))
+
+        hr = _HR_RE.search(lowered)
+        if hr and 30 <= int(hr.group(1)) <= 220:
+            found.append(entry("heart_rate", int(hr.group(1)), f"Heart rate {hr.group(1)} bpm"))
+
+        spo2 = _SPO2_RE.search(lowered)
+        if spo2 and 50 <= int(spo2.group(1)) <= 100:
+            found.append(entry("spo2", int(spo2.group(1)), f"SpO2 {spo2.group(1)}%"))
+
+        temp = _TEMP_RE.search(lowered)
+        if temp:
+            value = float(temp.group(1))
+            if 34 <= value <= 43:
+                found.append(entry("temperature", value, f"Temperature {value:g} °C"))
+            elif 93 <= value <= 110:
+                found.append(entry("temperature", value, f"Temperature {value:g} °F", unit="°F"))
+
+        return found
 
     @staticmethod
     def _meal_type(lowered: str) -> str:
