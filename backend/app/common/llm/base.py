@@ -19,6 +19,9 @@ class ExtractionResult:
     reply: str
     # Filled by real providers when the API reports it; feeds the LLM call log.
     usage: dict | None = None
+    # One short follow-up when something essential was missing ("what was the
+    # lower number?"); shown as a second MeMe bubble.
+    question: str | None = None
 
 
 class LLMProvider(ABC):
@@ -41,6 +44,7 @@ class LLMProvider(ABC):
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
         local_now: datetime | None = None,
+        user_context: dict | None = None,
     ) -> ExtractionResult:
         """`image_bytes`/`image_mime_type` are set when the message included
         a photo (VitaChat's photo logging). Providers without vision
@@ -49,6 +53,9 @@ class LLMProvider(ABC):
 
         `local_now` is the user's current wall-clock time, so "yesterday"
         and "for dinner" can be resolved to an `occurred_at`.
+
+        `user_context` (see app/logging/extraction/context.py) is what the
+        model should know about the person: allergies, goals, today's totals.
         """
         raise NotImplementedError
 

@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta
 
 from app.common.llm.base import ExtractedEntry, ExtractionResult, LLMProvider
+from app.logging.allergens import matching_allergens
 
 MOOD_WORDS = {
     "happy": ["happy", "great", "good", "energetic", "excited"],
@@ -14,13 +15,17 @@ MOOD_WORDS = {
 ACTIVITY_WORDS = ["walk", "run", "gym", "workout", "yoga", "swim", "cycle", "cycling", "jog"]
 
 SLEEP_RE = re.compile(r"slept?\s+(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?", re.IGNORECASE)
-FOOD_LEAD_WORDS = ["ate", "had", "eating", "breakfast", "lunch", "dinner", "snack", "drank"]
+# Hinglish: "7 ghante soya", "6.5 ghante ki neend"
+SLEEP_HI_RE = re.compile(r"(\d+(?:\.\d+)?)\s*ghan?t[ea]\w*\s*(?:ki\s+)?(?:neend|so(?:ya|yi|ye|ta|ti)|sleep)", re.IGNORECASE)
+FOOD_LEAD_WORDS = ["ate", "had", "eating", "breakfast", "lunch", "dinner", "snack", "drank", "khaya", "khayi", "khaaya", "khaai", "kha liya", "piya", "pi liya"]
 
 # "had"/"drank" alone shouldn't also log a meal when the message is just about
 # a drink — only these imply actual food.
-SOLID_FOOD_WORDS = ["ate", "eating", "breakfast", "lunch", "dinner", "snack"]
+SOLID_FOOD_WORDS = ["ate", "eating", "breakfast", "lunch", "dinner", "snack", "khaya", "khayi", "khaaya", "khaai", "kha liya", "nashta", "khana"]
 
-DRINK_WORDS = ["water", "juice", "tea", "coffee", "milk", "buttermilk", "smoothie"]
+DRINK_WORDS = ["water", "juice", "tea", "coffee", "milk", "buttermilk", "smoothie", "paani", "pani", "chai", "chaai", "doodh", "lassi", "nimbu paani"]
+# Hinglish drink words → the beverage name the aggregate and UI expect.
+_BEVERAGE_NAMES = {"paani": "water", "pani": "water", "nimbu paani": "lemon water", "chai": "tea", "chaai": "tea", "doodh": "milk"}
 VOLUME_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*(ml\b|milliliters?|millilitres?|l\b|litres?|liters?|glass(?:es)?|cups?|bottles?)",
     re.IGNORECASE,
@@ -43,7 +48,9 @@ _WEIGHT_RE = re.compile(r"(?:weight|weigh(?:ed|s|ing)?)\D{0,12}?(\d{2,3}(?:\.\d+
 _HR_RE = re.compile(r"(?:heart ?rate|pulse|\bhr\b)\D{0,12}?(\d{2,3})")
 _SPO2_RE = re.compile(r"(?:spo2|oxygen(?: saturation| level)?|\bo2\b)\D{0,12}?(\d{2,3})")
 _TEMP_RE = re.compile(r"(?:temperature|\btemp\b|fever)\D{0,12}?(\d{2,3}(?:\.\d)?)")
-_POST_MEAL_RE = re.compile(r"after (?:food|eating|a meal|meals?|lunch|dinner|breakfast)|post[- ]?meal|post[- ]?prandial|\bpp\b")
+_POST_MEAL_RE = re.compile(r"after (?:food|eating|a meal|meals?|lunch|dinner|breakfast)|post[- ]?meal|post[- ]?prandial|\bpp\b|khane ke baad")
+# A BP mentioned with one number and no "/" or "over": ask for the other half instead of guessing.
+_BP_HALF_RE = re.compile(r"(?:\bbp\b|blood pressure)\D{0,12}?(\d{2,3})\b(?!\s*(?:/|over)\s*\d)")
 _VITAL_UNITS = {
     "blood_pressure": "mmHg",
     "blood_glucose": "mg/dL",
@@ -65,7 +72,7 @@ def _has_word(text: str, word: str) -> bool:
 def _describes_eating(lowered: str) -> bool:
     """Whether the message says something was eaten, as opposed to merely
     naming a meal as a point in time ("sugar 110 after lunch")."""
-    if any(_has_word(lowered, word) for word in ("ate", "eating", "snack")):
+    if any(_has_word(lowered, word) for word in ("ate", "eating", "snack", "khaya", "khayi", "khaaya", "khaai", "kha liya", "nashta", "khana")):
         return True
     without_time_markers = _MEAL_AS_TIME_RE.sub(" ", lowered)
     return any(_has_word(without_time_markers, meal) for meal in ("breakfast", "lunch", "dinner"))
@@ -83,9 +90,11 @@ class MockProvider(LLMProvider):
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
         local_now: datetime | None = None,
+        user_context: dict | None = None,
     ) -> ExtractionResult:
         lowered = text.lower()
         entries: list[ExtractedEntry] = []
+        question: str | None = None
 
         hydration = self._hydration(lowered)
         if hydration is not None:
@@ -93,6 +102,10 @@ class MockProvider(LLMProvider):
 
         vitals = self._vitals(lowered)
         entries.extend(vitals)
+        if not any(v.payload.get("kind") == "blood_pressure" for v in vitals):
+            half = _BP_HALF_RE.search(lowered)
+            if half and 70 <= int(half.group(1)) <= 250:
+                question = f"Got the {half.group(1)} — what was the lower (diastolic) number? I'll log the full reading."
 
         # A drink-only message ("drank 2 glasses of water") or a reading
         # ("had bp 120/80 this morning", "sugar 6.1 after lunch") shouldn't
@@ -109,7 +122,7 @@ class MockProvider(LLMProvider):
                 )
             )
 
-        sleep_match = SLEEP_RE.search(lowered)
+        sleep_match = SLEEP_RE.search(lowered) or SLEEP_HI_RE.search(lowered)
         if sleep_match:
             hours = float(sleep_match.group(1))
             entries.append(
@@ -136,6 +149,9 @@ class MockProvider(LLMProvider):
                 )
             )
 
+        if not entries and question is not None:
+            return ExtractionResult(entries=[], reply="Nearly there.", question=question)
+
         if not entries:
             if image_bytes is not None:
                 return ExtractionResult(
@@ -155,7 +171,22 @@ class MockProvider(LLMProvider):
                     entry.occurred_at = occurred_at
 
         summaries = "; ".join(e.summary for e in entries)
-        return ExtractionResult(entries=entries, reply=f"Logged: {summaries}")
+        reply = f"Logged: {summaries}"
+
+        # Allergens first, in the reply and on the entry — same contract the
+        # real model is prompted with.
+        allergies = (user_context or {}).get("allergies") or []
+        if allergies:
+            for entry in entries:
+                if entry.type != "food":
+                    continue
+                hits = matching_allergens(allergies, [*(entry.payload.get("food_items") or []), text])
+                if hits:
+                    entry.payload["allergens"] = hits
+                    reply = f"Heads up — that may contain {', '.join(hits)}, which is on your allergy list. Please double-check before eating. " + reply
+                    break
+
+        return ExtractionResult(entries=entries, reply=reply, question=question)
 
     @staticmethod
     def _occurred_at(lowered: str, local_now: datetime | None) -> str | None:
@@ -211,11 +242,12 @@ class MockProvider(LLMProvider):
         else:
             # No amount given — only assume a serving if they clearly drank
             # something, rather than merely mentioning it.
-            if not any(_has_word(lowered, verb) for verb in ("drank", "drink", "had", "sipping", "sipped")):
+            if not any(_has_word(lowered, verb) for verb in ("drank", "drink", "had", "sipping", "sipped", "piya", "pi liya", "liya")):
                 return None
             volume_ml = _DEFAULT_SERVING_ML
 
         volume_ml = round(volume_ml)
+        beverage = _BEVERAGE_NAMES.get(beverage, beverage)
         return ExtractedEntry(
             type="hydration",
             payload={"volume_ml": volume_ml, "beverage": beverage},
@@ -294,6 +326,10 @@ class MockProvider(LLMProvider):
     def _meal_type(lowered: str) -> str:
         for meal in ("breakfast", "lunch", "dinner", "snack"):
             if _has_word(lowered, meal):
+                return meal
+        # Hinglish time-of-day words: subah (morning), dopahar (afternoon), raat (night), nashta (breakfast).
+        for word, meal in (("nashta", "breakfast"), ("subah", "breakfast"), ("dopahar", "lunch"), ("raat", "dinner"), ("shaam", "snack")):
+            if _has_word(lowered, word):
                 return meal
         return "snack"
 

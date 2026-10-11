@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 
 class ChatExtractionResult {
-  const ChatExtractionResult({required this.entries, required this.alerts, required this.reply, this.degraded = false});
+  const ChatExtractionResult({required this.entries, required this.alerts, required this.reply, this.degraded = false, this.question});
 
   final List<Map<String, dynamic>> entries;
   final List<Map<String, dynamic>> alerts;
@@ -14,11 +14,15 @@ class ChatExtractionResult {
   /// deserve a glance.
   final bool degraded;
 
+  /// MeMe's one follow-up when something essential was missing.
+  final String? question;
+
   factory ChatExtractionResult.fromJson(Map<String, dynamic> json) => ChatExtractionResult(
         entries: List<Map<String, dynamic>>.from(json['entries'] as List? ?? []),
         alerts: List<Map<String, dynamic>>.from(json['alerts'] as List? ?? []),
         reply: json['reply'] as String? ?? '',
         degraded: json['degraded'] as bool? ?? false,
+        question: (json['question'] as String?)?.trim().isEmpty ?? true ? null : (json['question'] as String).trim(),
       );
 }
 

@@ -242,6 +242,7 @@ class ChatController extends StateNotifier<ChatState> {
         for (final alert in result.alerts)
           ChatThreadItem.alert(message: alert['message'] as String, hard: alert['severity'] == 'hard'),
         if (result.reply.isNotEmpty) ChatThreadItem.assistantReply(result.reply),
+        if (result.question != null) ChatThreadItem.assistantReply(result.question!),
       ];
       state = state.copyWith(
         items: [

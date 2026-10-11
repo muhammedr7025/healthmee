@@ -36,7 +36,41 @@ is today — omit occurred_at.
 """
 
 
-def build_system_prompt(type_catalog: list[dict], local_now=None) -> str:
+USER_CONTEXT_TEMPLATE = """
+About this person (use it; never recite it back to them):
+- Name: {name}
+- Allergies — ALWAYS check every food against these: {allergies}
+- Conditions: {conditions}. Medications: {medications}.
+- Goals: {goals}
+- Units: metric — kg, cm, mmHg, mg/dL (blood sugar may also arrive in mmol/L). They live in {locale} and \
+may write in Hinglish ("2 roti khaya", "paani piya", "raat ko 7 ghante soya"); understand it, reply in plain English.
+- Today so far ({date}): {kcal} kcal, {water_l} L water, {activity_min} min active, last sleep {sleep_h}, {log_count} logs.
+- Recent logs: {recent}
+Indian portions when estimating: roti/chapati ~70 kcal, idli ~40, plain dosa ~130, 1 cup cooked rice ~200, \
+1 cup dal ~180, 1 cup sambar ~130, chai with milk and sugar ~90, paratha ~150, 1 plate biryani ~500, \
+1 cup curd ~100, 100 g paneer ~265, 1 banana ~90.
+
+Reply rules:
+- If a food contains or likely contains one of their allergens, say so FIRST and plainly ("Heads up — that has \
+peanuts, which is on your allergy list") and put it in that entry's allergens field. Never bury it after a cheerful line.
+- One sentence that acknowledges what they said, one that adds something from their own day or goals (a running \
+total, a nudge toward a target). No lectures, no strings of emoji, vary your openers.
+- Ask at most ONE short question in clarifying_question, only when something essential is missing — the second \
+blood-pressure number, a portion that changes the picture. Still log what you can.
+
+Good replies:
+- "Logged the idli and sambar — a light ~250 kcal start. You're at 0.5 L of water so far; a glass with lunch would be a good move."
+- "Heads up — peanut chutney has peanuts, which is on your allergy list. I've logged it; please double-check before eating."
+- "BP 128/82 noted, right in the usual range. That's your third reading this week — nice consistency."
+"""
+
+
+def _fmt_list(items, empty: str = "none recorded") -> str:
+    items = [str(i) for i in (items or []) if str(i).strip()]
+    return ", ".join(items) if items else empty
+
+
+def build_system_prompt(type_catalog: list[dict], local_now=None, user_context: dict | None = None) -> str:
     lines = []
     for t in type_catalog:
         fields = ", ".join(_describe_field(name, spec) for name, spec in t["schema"].items())
@@ -44,6 +78,24 @@ def build_system_prompt(type_catalog: list[dict], local_now=None) -> str:
     prompt = SYSTEM_PROMPT_TEMPLATE.format(type_descriptions="\n".join(lines))
     if local_now is not None:
         prompt += TIME_RULES_TEMPLATE.format(local_now=local_now.strftime("%A %Y-%m-%d %H:%M"))
+    if user_context:
+        today = user_context.get("today") or {}
+        sleep = today.get("sleep_h")
+        prompt += USER_CONTEXT_TEMPLATE.format(
+            name=user_context.get("name") or "not given",
+            allergies=_fmt_list(user_context.get("allergies"), "none recorded — still mention common allergens if a dish obviously contains them"),
+            conditions=_fmt_list(user_context.get("conditions")),
+            medications=_fmt_list(user_context.get("medications")),
+            goals=_fmt_list(user_context.get("goals"), "none set"),
+            locale=user_context.get("locale") or "their own country",
+            date=today.get("date", ""),
+            kcal=today.get("kcal", 0),
+            water_l=today.get("water_l", 0),
+            activity_min=today.get("activity_min", 0),
+            sleep_h=f"{sleep:g}h" if isinstance(sleep, (int, float)) else "not logged",
+            log_count=today.get("log_count", 0),
+            recent=_fmt_list(user_context.get("recent"), "nothing yet"),
+        )
     return prompt
 
 
@@ -90,6 +142,11 @@ def build_tool_schema(type_catalog: list[dict]) -> dict:
                 "reply": {
                     "type": "string",
                     "description": "A short, warm conversational reply confirming what was logged.",
+                },
+                "clarifying_question": {
+                    "type": "string",
+                    "description": "At most one short question, only when something essential is missing "
+                    "(e.g. the second blood-pressure number). Omit otherwise.",
                 },
             },
             "required": ["entries", "reply"],

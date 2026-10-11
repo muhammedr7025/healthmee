@@ -205,8 +205,11 @@ class _ChatHeader extends StatelessWidget {
             ),
           ),
           if (streak > 0)
-            GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GoalsScreen())),
+            Semantics(
+              button: true,
+              label: '$streak day logging streak. Open goals',
+              child: GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(settings: const RouteSettings(name: 'goals'), builder: (_) => const GoalsScreen())),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
                 decoration: BoxDecoration(
@@ -222,6 +225,7 @@ class _ChatHeader extends StatelessWidget {
                     Text('$streak', style: HealthTypography.body(fontSize: 12.5, weight: FontWeight.w700, color: HealthColors.accentPrimaryDark)),
                   ],
                 ),
+              ),
               ),
             ),
         ],
@@ -492,7 +496,9 @@ class _RatingButtonsState extends State<_RatingButtons> {
   Widget _button(bool up) {
     final active = _rated == up;
     final dimmed = _rated != null && !active;
-    return InkWell(
+    return Tooltip(
+      message: up ? 'Helpful' : 'Not quite right',
+      child: InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: _rated != null
           ? null
@@ -508,6 +514,7 @@ class _RatingButtonsState extends State<_RatingButtons> {
           size: 14,
           color: active ? HealthColors.accentPrimaryDark : (dimmed ? HealthColors.divider : HealthColors.inkFaint),
         ),
+      ),
       ),
     );
   }
@@ -823,7 +830,7 @@ class _RoundIconButton extends StatelessWidget {
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
-          child: SizedBox(width: 38, height: 38, child: Icon(icon, size: 18, color: foreground)),
+          child: SizedBox(width: 44, height: 44, child: Icon(icon, size: 18, color: foreground)),
         ),
       ),
     );

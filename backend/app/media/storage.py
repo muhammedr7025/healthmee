@@ -72,6 +72,24 @@ def upload_bytes(key: str, data: bytes, content_type: str) -> None:
     _client().put_object(Bucket=current_app.config["S3_BUCKET"], Key=key, Body=data, ContentType=content_type)
 
 
+def delete_objects(storage_keys: list[str]) -> None:
+    """Best-effort sweep of uploaded photos/PDFs/reports when their rows go
+    (account deletion, report revoke). Logged, never raised: the rows are the
+    system of record and the user shouldn't see a 500 because a bucket call
+    hiccuped."""
+    keys = [k for k in storage_keys if k]
+    if not keys:
+        return
+    client = _client()
+    bucket = current_app.config["S3_BUCKET"]
+    for start in range(0, len(keys), 1000):
+        chunk = keys[start : start + 1000]
+        try:
+            client.delete_objects(Bucket=bucket, Delete={"Objects": [{"Key": k} for k in chunk], "Quiet": True})
+        except Exception:
+            current_app.logger.exception("failed to delete %d objects from storage", len(chunk))
+
+
 class MediaTooLarge(ValueError):
     def __init__(self, size: int, limit: int):
         super().__init__(f"object is {size} bytes; limit is {limit}")

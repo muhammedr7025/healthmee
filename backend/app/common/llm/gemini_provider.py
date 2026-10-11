@@ -30,6 +30,7 @@ class GeminiProvider(LLMProvider):
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
         local_now=None,
+        user_context=None,
     ) -> ExtractionResult:
         type_names = [t["name"] for t in type_catalog]
         # Deliberately NOT using response_schema: the entry payload differs per
@@ -37,12 +38,13 @@ class GeminiProvider(LLMProvider):
         # rejects an OBJECT schema without properties. JSON mode plus an
         # explicit shape in the prompt gets the same result without that limit.
         system = (
-            f"{build_system_prompt(type_catalog, local_now=local_now)}\n\n"
+            f"{build_system_prompt(type_catalog, local_now=local_now, user_context=user_context)}\n\n"
             "Respond with JSON only, in exactly this shape:\n"
             '{"entries": [{"type": "<one of: ' + ", ".join(type_names) + '>", '
             '"payload": {<fields for that type>}, "summary": "<short one-liner>", '
             '"occurred_at": "<local ISO 8601 date-time, ONLY if the message says when; otherwise omit the key>"}], '
-            '"reply": "<short warm confirmation>"}\n'
+            '"reply": "<short warm confirmation>", '
+            '"clarifying_question": "<ONE short question only if something essential is missing; otherwise omit the key>"}\n'
             'If nothing is loggable, use {"entries": [], "reply": "..."}.'
         )
 
@@ -86,7 +88,9 @@ class GeminiProvider(LLMProvider):
             for e in (data.get("entries") or [])
             if isinstance(e, dict) and e.get("type") in type_names
         ]
-        return ExtractionResult(entries=entries, reply=data.get("reply", ""), usage=_usage(response))
+        return ExtractionResult(
+            entries=entries, reply=data.get("reply", ""), usage=_usage(response), question=(data.get("clarifying_question") or None)
+        )
 
     def read_lab_report(self, file_bytes: bytes, mime_type: str) -> dict:
         """Photos and PDFs alike — Gemini takes application/pdf inline, so a

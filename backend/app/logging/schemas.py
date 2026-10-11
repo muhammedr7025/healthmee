@@ -42,6 +42,8 @@ class ChatResponseSchema(Schema):
     # turn instead — the app asks the user to glance at the card.
     degraded = fields.Boolean(dump_only=True)
     reply = fields.String(dump_only=True)
+    # One short follow-up when something essential was missing; shown as a second bubble.
+    question = fields.String(dump_only=True, allow_none=True)
     validation_errors = fields.List(fields.String(), dump_only=True)
 
 

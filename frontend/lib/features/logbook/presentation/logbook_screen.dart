@@ -646,7 +646,10 @@ class _LogRowState extends ConsumerState<_LogRow> {
     final entry = widget.entry;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
+      child: Semantics(
+        button: true,
+        label: '${TypeTag.labelFor(entry.type)}: ${entry.summary ?? ''}, ${DateFormat('MMM d, HH:mm').format(entry.timestamp)}. Opens details',
+        child: GestureDetector(
         onTap: _openEntry,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
@@ -682,10 +685,11 @@ class _LogRowState extends ConsumerState<_LogRow> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                TypeTag(entry.type),
+                ExcludeSemantics(child: TypeTag(entry.type)),
               ],
             ),
           ),
+        ),
         ),
       ),
     );

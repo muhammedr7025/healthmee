@@ -12,6 +12,7 @@ from app.extensions import db
 from app.goals.models import Goal
 from app.logging.models import ChatMessage, LogEntry
 from app.media.models import MediaAsset
+from app.media.storage import delete_objects
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.notifications.models import AlertLog, NotificationPreference
 from app.push.models import DeviceToken, PushLog
@@ -40,7 +41,37 @@ def export_account_data(user_id: str) -> dict:
                 (CaregiverLink.owner_user_id == user_id) | (CaregiverLink.caregiver_user_id == user_id)
             ).all()
         ],
+        # Everything else the account owns — a data export that left these out
+        # wasn't an export.
+        "medications": [_row(m) for m in _medications(user_id)],
+        "medication_doses": [_row(d) for d in _doses(user_id)],
+        "notification_preferences": [p.to_dict() for p in NotificationPreference.query.filter_by(user_id=user_id).all()],
+        "devices": [d.to_dict() for d in DeviceToken.query.filter_by(user_id=user_id).all()],
+        "reports": [_row(r) for r in GeneratedReport.query.filter_by(user_id=user_id).all()],
+        "subscription": [_row(s) for s in Subscription.query.filter_by(user_id=user_id).all()],
+        "push_log": [p.to_dict() for p in PushLog.query.filter_by(user_id=user_id).all()],
     }
+
+
+def _row(obj) -> dict:
+    """Column-wise dump for models without a to_dict, with datetimes as ISO."""
+    out = {}
+    for column in obj.__table__.columns:
+        value = getattr(obj, column.name)
+        out[column.name] = value.isoformat() if hasattr(value, "isoformat") else value
+    return out
+
+
+def _medications(user_id: str):
+    from app.medications.models import MedicationSchedule
+
+    return MedicationSchedule.query.filter_by(user_id=user_id).all()
+
+
+def _doses(user_id: str):
+    from app.medications.models import MedicationDose
+
+    return MedicationDose.query.filter_by(user_id=user_id).all()
 
 
 def delete_account(user_id: str) -> None:
@@ -49,6 +80,10 @@ def delete_account(user_id: str) -> None:
     uploaded to MinIO/S3) is not swept — the DB rows referencing them are
     removed, but the underlying files aren't deleted from the bucket.
     """
+    # Object keys first: the rows are about to go, and the files should go with them.
+    storage_keys = [a.storage_key for a in MediaAsset.query.filter_by(user_id=user_id).all()]
+    storage_keys += [r.storage_key for r in GeneratedReport.query.filter_by(user_id=user_id).all()]
+
     ChatMessage.query.filter_by(user_id=user_id).delete()
     AlertLog.query.filter_by(user_id=user_id).delete()
     LogEntry.query.filter_by(user_id=user_id).delete()
@@ -79,3 +114,5 @@ def delete_account(user_id: str) -> None:
 
     User.query.filter_by(id=user_id).delete()
     db.session.commit()
+
+    delete_objects(storage_keys)

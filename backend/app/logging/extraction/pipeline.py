@@ -11,6 +11,7 @@ from app.common.localtime import local_date_of, local_now, to_local, to_utc, use
 from app.common.models import utcnow
 from app.events.service import record_llm_call, track
 from app.extensions import db
+from app.logging.extraction.context import build_user_context
 from app.logging.models import ChatMessage, LogEntry
 from app.logging.registry import get_type, get_type_catalog, sanitize_payload, validate_payload
 from app.media.models import MediaAsset
@@ -18,7 +19,12 @@ from app.media.storage import download_bytes
 
 
 def _extract_with_fallback(
-    user_id: str, text: str, image_bytes: bytes | None, image_mime_type: str | None, now_local: datetime
+    user_id: str,
+    text: str,
+    image_bytes: bytes | None,
+    image_mime_type: str | None,
+    now_local: datetime,
+    user_context: dict | None = None,
 ) -> tuple[ExtractionResult, bool]:
     """Run the configured provider, falling back to the offline keyword
     extractor if it errors. Returns (result, degraded).
@@ -35,7 +41,12 @@ def _extract_with_fallback(
     started = time.perf_counter()
     try:
         result = provider.extract(
-            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
+            text,
+            get_type_catalog(),
+            image_bytes=image_bytes,
+            image_mime_type=image_mime_type,
+            local_now=now_local,
+            user_context=user_context,
         )
     except Exception:
         latency_ms = round((time.perf_counter() - started) * 1000)
@@ -47,7 +58,12 @@ def _extract_with_fallback(
         if isinstance(provider, MockProvider):
             raise  # nothing left to fall back to
         result = MockProvider().extract(
-            text, get_type_catalog(), image_bytes=image_bytes, image_mime_type=image_mime_type, local_now=now_local
+            text,
+            get_type_catalog(),
+            image_bytes=image_bytes,
+            image_mime_type=image_mime_type,
+            local_now=now_local,
+            user_context=user_context,
         )
         return result, True
 
@@ -115,7 +131,8 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
 
     tz_offset = user_tz_offset(user)
     now_local = local_now(tz_offset)
-    result, degraded = _extract_with_fallback(user.id, text, image_bytes, image_mime_type, now_local)
+    user_context = build_user_context(user, now_local.date())
+    result, degraded = _extract_with_fallback(user.id, text, image_bytes, image_mime_type, now_local, user_context)
 
     created_entries: list[LogEntry] = []
     all_alerts = []
@@ -157,7 +174,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         touched_dates.add(local_date_of(log_entry.timestamp, tz_offset))
 
     db.session.flush()  # assign ids to alerts before the transcript rows reference them
-    _record_chat_transcript(user, text, media_asset_id, created_entries, all_alerts, result.reply)
+    _record_chat_transcript(user, text, media_asset_id, created_entries, all_alerts, result.reply, question=result.question)
 
     track(
         "extraction_result",
@@ -170,6 +187,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         validation_errors=len(validation_errors),
         has_photo=image_bytes is not None,
         degraded=degraded,
+        asked_question=result.question is not None,
         chars=len(text or ""),
     )
     db.session.commit()
@@ -187,10 +205,11 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
         "reply": result.reply,
         "validation_errors": validation_errors,
         "degraded": degraded,
+        "question": result.question,
     }
 
 
-def _record_chat_transcript(user, text, media_asset_id, created_entries, alerts, reply) -> None:
+def _record_chat_transcript(user, text, media_asset_id, created_entries, alerts, reply, question=None) -> None:
     """Persists every bubble this turn produced, in display order, so the
     thread survives an app restart (see ChatMessage). Timestamps are
     staggered by a microsecond per row since several rows are otherwise
@@ -208,6 +227,8 @@ def _record_chat_transcript(user, text, media_asset_id, created_entries, alerts,
         rows.append(ChatMessage(user_id=user.id, kind="alert", alert_id=alert.id))
     if reply:
         rows.append(ChatMessage(user_id=user.id, kind="assistant_reply", text=reply))
+    if question:
+        rows.append(ChatMessage(user_id=user.id, kind="assistant_reply", text=question))
 
     base = utcnow()
     for i, row in enumerate(rows):

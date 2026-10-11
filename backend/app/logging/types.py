@@ -18,6 +18,8 @@ def register_builtin_types() -> None:
                 "protein_g": {"type": "number", "required": False},
                 "carbs_g": {"type": "number", "required": False},
                 "fat_g": {"type": "number", "required": False},
+                # Likely allergens in the dish (peanut, milk, egg, wheat, soy, shellfish, fish, tree nut, sesame).
+                "allergens": {"type": "list[str]", "required": False},
             },
             handlers=[allergy_check_handler],
         )

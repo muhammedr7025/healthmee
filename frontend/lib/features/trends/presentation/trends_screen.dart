@@ -366,7 +366,7 @@ class _ReadView extends ConsumerWidget {
                   crossAxisCount: 2,
                   mainAxisSpacing: 9,
                   crossAxisSpacing: 9,
-                  childAspectRatio: 2.0,
+                  childAspectRatio: 2.0 / MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
                   children: [
                     _StatTile(
                       label: 'Days logged',

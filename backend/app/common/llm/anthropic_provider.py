@@ -27,9 +27,10 @@ class AnthropicProvider(LLMProvider):
         image_bytes: bytes | None = None,
         image_mime_type: str | None = None,
         local_now=None,
+        user_context=None,
     ) -> ExtractionResult:
         tool = build_tool_schema(type_catalog)
-        system = build_system_prompt(type_catalog, local_now=local_now)
+        system = build_system_prompt(type_catalog, local_now=local_now, user_context=user_context)
         content = _user_content(text or "What's in this photo? Log it.", image_bytes, image_mime_type)
 
         response = self._client.messages.create(
@@ -55,7 +56,9 @@ class AnthropicProvider(LLMProvider):
                     for e in data.get("entries", [])
                     if isinstance(e, dict) and e.get("type")
                 ]
-                return ExtractionResult(entries=entries, reply=data.get("reply", ""), usage=usage)
+                return ExtractionResult(
+                    entries=entries, reply=data.get("reply", ""), usage=usage, question=(data.get("clarifying_question") or None)
+                )
 
         return ExtractionResult(entries=[], reply="Sorry, I couldn't process that message.", usage=usage)
 

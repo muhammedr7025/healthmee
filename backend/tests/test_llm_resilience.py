@@ -10,7 +10,7 @@ from app.common.llm.base import ExtractionResult, LLMProvider
 class _ExplodingProvider(LLMProvider):
     """Stands in for a rate-limited / unreachable provider."""
 
-    def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None):
+    def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None, **kwargs):
         raise RuntimeError("429 Resource has been exhausted (e.g. check quota)")
 
 
@@ -32,7 +32,7 @@ def test_narrative_is_not_regenerated_while_the_numbers_are_unchanged(auth_clien
     calls = {"n": 0}
 
     class _CountingProvider(LLMProvider):
-        def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None):
+        def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None, **kwargs):
             return ExtractionResult(entries=[], reply="")
 
         def narrate(self, prompt, stats):
@@ -52,7 +52,7 @@ def test_narrative_regenerates_once_the_numbers_move(auth_client, app, monkeypat
     calls = {"n": 0}
 
     class _CountingProvider(LLMProvider):
-        def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None):
+        def extract(self, text, type_catalog, image_bytes=None, image_mime_type=None, **kwargs):
             return ExtractionResult(entries=[], reply="")
 
         def narrate(self, prompt, stats):

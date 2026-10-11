@@ -235,7 +235,10 @@ class _ScoreCard extends ConsumerWidget {
     final s = score.valueOrNull;
     final value = s?.score ?? 0;
 
-    return HealthCard(
+    return Semantics(
+      button: s != null,
+      label: s == null ? "Today's score is loading" : "Today's score ${s.score} out of 100. ${_headline(s)}. Opens how it's calculated",
+      child: HealthCard(
       padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(HealthSpacing.radiusMd),
@@ -283,6 +286,7 @@ class _ScoreCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -414,7 +418,8 @@ class _TodayGrid extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: HealthSpacing.sm,
       crossAxisSpacing: HealthSpacing.sm,
-      childAspectRatio: 1.7,
+      // Taller tiles when the system text size is larger, so the numbers don't clip.
+      childAspectRatio: 1.7 / MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
       children: tiles
           .map((t) => Container(
                 padding: const EdgeInsets.all(14),
@@ -635,15 +640,22 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
+    // The coloured pill stays compact; the tap target around it is 44px tall.
+    return Semantics(
+      button: true,
+      label: label,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-          child: Text(label, style: HealthTypography.body(fontSize: 12, weight: FontWeight.w600, color: fg)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+              child: Text(label, style: HealthTypography.body(fontSize: 12, weight: FontWeight.w600, color: fg)),
+            ),
+          ),
         ),
       ),
     );

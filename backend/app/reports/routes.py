@@ -10,7 +10,7 @@ from app.analytics.models import DailyAggregate
 from app.events.service import track
 from app.extensions import db, limiter, user_or_ip
 from app.logging.models import LogEntry
-from app.media.storage import presign_download, upload_bytes
+from app.media.storage import delete_objects, presign_download, upload_bytes
 from app.medical_profile.models import Allergy, LabResult, MedicalProfile
 from app.reports.models import GeneratedReport
 from app.reports.pdf_generator import build_report_pdf
@@ -135,9 +135,10 @@ class ReportDetail(MethodView):
     @jwt_required()
     @blp.response(204)
     def delete(self, report_id):
-        """Revoke: removes the record so no further download links can be
-        issued for it. (The already-uploaded object isn't swept from the
-        bucket — out of scope for this pass.)"""
+        """Revoke: removes the record and the PDF itself, so an already-issued
+        link stops working once the object is gone."""
         report = GeneratedReport.query.filter_by(id=report_id, user_id=get_jwt_identity()).first_or_404()
+        storage_key = report.storage_key
         db.session.delete(report)
         db.session.commit()
+        delete_objects([storage_key])
