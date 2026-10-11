@@ -39,7 +39,7 @@ class TodayScreen extends ConsumerWidget {
             ref.invalidate(medicationsTodayProvider);
             ref.invalidate(trendsDataProvider);
           },
-          child: asyncAggregate.when(
+          child: asyncAggregate.when(skipLoadingOnReload: true, 
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (err, _) => ListView(
               children: [
@@ -130,12 +130,12 @@ class _TodayBody extends ConsumerWidget {
         const _MedicinesCard(),
         if (callout != null) ...[
           const SizedBox(height: HealthSpacing.sm),
-          _NudgeCard(text: callout),
+          NudgeCard(text: callout),
         ],
         const SizedBox(height: HealthSpacing.lg),
         Text("TODAY'S TIMELINE · TAP FOR DETAILS", style: HealthTypography.label()),
         const SizedBox(height: HealthSpacing.sm),
-        asyncEntries.when(
+        asyncEntries.when(skipLoadingOnReload: true, 
           loading: () => const LinearProgressIndicator(),
           error: (e, _) => Text('Could not load entries.', style: HealthTypography.body()),
           data: (entries) => entries.isEmpty
@@ -472,7 +472,7 @@ class _MedicinesCard extends ConsumerWidget {
 
     return HealthCard(
       padding: const EdgeInsets.all(16),
-      child: asyncPlan.when(
+      child: asyncPlan.when(skipLoadingOnReload: true, 
         loading: () => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -645,31 +645,6 @@ class _Pill extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
           child: Text(label, style: HealthTypography.body(fontSize: 12, weight: FontWeight.w600, color: fg)),
         ),
-      ),
-    );
-  }
-}
-
-class _NudgeCard extends StatelessWidget {
-  const _NudgeCard({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: HealthColors.reactionBubble,
-        border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.25)),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const MemeMascot(state: MascotState.curious, size: 38),
-          const SizedBox(width: 12),
-          Expanded(child: Text(text, style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText))),
-        ],
       ),
     );
   }

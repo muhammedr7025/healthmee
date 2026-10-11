@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:health_ui/health_ui.dart';
+
 import 'app.dart';
 import 'core/analytics/analytics.dart';
 
 void main() {
+  HealthTheme.useBundledFonts();
   final container = ProviderContainer();
   final analytics = container.read(analyticsProvider);
 

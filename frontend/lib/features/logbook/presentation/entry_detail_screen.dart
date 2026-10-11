@@ -193,24 +193,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
               ),
             ),
             const SizedBox(height: HealthSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: HealthColors.reactionBubble,
-                border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.25)),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  MemeMascot(state: mascotFor(entry), size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(memeCommentFor(entry), style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText)),
-                  ),
-                ],
-              ),
-            ),
+            NudgeCard(text: memeCommentFor(entry), mascot: mascotFor(entry)),
             const SizedBox(height: HealthSpacing.lg),
             Row(
               children: [

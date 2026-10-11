@@ -14,10 +14,20 @@ import '../domain/chat_thread_item.dart';
 import '../domain/log_row_formatter.dart';
 
 class ChatState {
-  const ChatState({this.items = const [], this.isThinking = false, this.isLoadingHistory = true, this.historyFailed = false});
+  const ChatState({
+    this.items = const [],
+    this.isThinking = false,
+    this.isLoadingHistory = true,
+    this.historyFailed = false,
+    this.hasEarlier = false,
+    this.loadingEarlier = false,
+  });
 
   final List<ChatThreadItem> items;
   final bool isThinking;
+  /// Older messages exist on the server beyond what's loaded.
+  final bool hasEarlier;
+  final bool loadingEarlier;
   // True only for the brief window while the persisted thread is being
   // fetched on launch — lets the screen hold off on showing the "nothing
   // logged yet" empty state, which would otherwise flash before a returning
@@ -27,11 +37,21 @@ class ChatState {
   // so instead of showing an empty state that reads as "your logs are gone".
   final bool historyFailed;
 
-  ChatState copyWith({List<ChatThreadItem>? items, bool? isThinking, bool? isLoadingHistory, bool? historyFailed}) => ChatState(
+  ChatState copyWith({
+    List<ChatThreadItem>? items,
+    bool? isThinking,
+    bool? isLoadingHistory,
+    bool? historyFailed,
+    bool? hasEarlier,
+    bool? loadingEarlier,
+  }) =>
+      ChatState(
         items: items ?? this.items,
         isThinking: isThinking ?? this.isThinking,
         isLoadingHistory: isLoadingHistory ?? this.isLoadingHistory,
         historyFailed: historyFailed ?? this.historyFailed,
+        hasEarlier: hasEarlier ?? this.hasEarlier,
+        loadingEarlier: loadingEarlier ?? this.loadingEarlier,
       );
 }
 
@@ -65,9 +85,13 @@ class ChatController extends StateNotifier<ChatState> {
   /// Restores the thread on launch so closing and reopening the app doesn't
   /// wipe it — plus MeMe's "we missed you" nudge when the thread's been
   /// quiet long enough, tacked on as the newest bubble.
+  // created_at of the oldest row loaded so far — the cursor for "load earlier".
+  DateTime? _oldestLoaded;
+
   Future<void> _loadHistory() async {
     try {
       final history = await _repo.fetchHistory();
+      _oldestLoaded = _createdAt(history.items.firstOrNull);
       state = state.copyWith(
         items: [
           for (final raw in history.items) ?_fromHistoryJson(raw),
@@ -75,6 +99,7 @@ class ChatController extends StateNotifier<ChatState> {
         ],
         isLoadingHistory: false,
         historyFailed: false,
+        hasEarlier: history.hasMore,
       );
     } catch (_) {
       // Offline, or the token isn't ready yet — the thread starts empty but
@@ -86,6 +111,33 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> reloadHistory() async {
     state = state.copyWith(isLoadingHistory: true);
     await _loadHistory();
+  }
+
+  static DateTime? _createdAt(Map<String, dynamic>? raw) {
+    final value = raw?['created_at'];
+    if (value is! String) return null;
+    // Server timestamps are naive UTC.
+    final parsed = DateTime.tryParse(value.endsWith('Z') ? value : '${value}Z');
+    return parsed;
+  }
+
+  /// "Load earlier" at the top of the thread: one page of older rows,
+  /// prepended, without touching the live end.
+  Future<void> loadEarlier() async {
+    if (!state.hasEarlier || state.loadingEarlier || _oldestLoaded == null) return;
+    state = state.copyWith(loadingEarlier: true);
+    try {
+      final page = await _repo.fetchHistory(before: _oldestLoaded);
+      _oldestLoaded = _createdAt(page.items.firstOrNull) ?? _oldestLoaded;
+      state = state.copyWith(
+        items: [for (final raw in page.items) ?_fromHistoryJson(raw), ...state.items],
+        hasEarlier: page.hasMore,
+        loadingEarlier: false,
+      );
+      _ref.read(analyticsProvider).track('history_loaded_earlier', {'rows': page.items.length});
+    } catch (_) {
+      state = state.copyWith(loadingEarlier: false);
+    }
   }
 
   ChatThreadItem? _fromHistoryJson(Map<String, dynamic> json) {

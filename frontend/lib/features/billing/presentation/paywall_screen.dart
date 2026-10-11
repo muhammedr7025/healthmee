@@ -69,7 +69,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: asyncSub.when(
+        child: asyncSub.when(skipLoadingOnReload: true, 
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Padding(
             padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -123,7 +123,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 Container(
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFDEEE4),
+                    color: HealthColors.warnBg,
                     border: Border.all(color: HealthColors.accentPrimary, width: 1.5),
                     borderRadius: BorderRadius.circular(20),
                   ),

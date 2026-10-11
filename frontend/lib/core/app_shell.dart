@@ -38,7 +38,7 @@ class AppShell extends ConsumerWidget {
         ref.invalidate(narrativeProvider);
         break;
       case 3:
-        ref.invalidate(logbookEntriesProvider);
+        ref.invalidate(logbookPagerProvider);
         break;
     }
   }
@@ -60,7 +60,9 @@ class AppShell extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: IndexedStack(index: index, children: _screens),
+      // Fades between tabs, builds a tab on first visit only, and pauses the
+      // hidden tabs' animations.
+      body: FadeIndexedStack(index: index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) {

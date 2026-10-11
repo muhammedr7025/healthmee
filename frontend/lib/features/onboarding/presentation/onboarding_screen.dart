@@ -398,7 +398,7 @@ class _RecapRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
         decoration: BoxDecoration(
-          color: highlight ? const Color(0xFFFDEEE4) : HealthColors.surface,
+          color: highlight ? HealthColors.warnBg : HealthColors.surface,
           border: Border.all(
             color: highlight
                 ? HealthColors.accentPrimary.withValues(alpha: 0.35)

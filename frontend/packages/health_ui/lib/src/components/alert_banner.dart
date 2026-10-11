@@ -51,9 +51,15 @@ class _AlertBannerState extends State<AlertBanner> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.hard ? HealthColors.alertTrigger : HealthColors.accentPrimary;
+    // Soft is turmeric gold: a network error or a disclaimer must not look
+    // like an allergy warning.
+    final color = widget.hard ? HealthColors.alertTrigger : HealthColors.softAlert;
+    final background = widget.hard ? color.withValues(alpha: 0.12) : HealthColors.softAlertBg;
 
-    return AnimatedBuilder(
+    return Semantics(
+      liveRegion: widget.hard,
+      label: widget.message,
+      child: AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         final t = _controller.value;
@@ -66,7 +72,7 @@ class _AlertBannerState extends State<AlertBanner> with SingleTickerProviderStat
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: HealthSpacing.md, vertical: HealthSpacing.sm + 2),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
+          color: background,
           borderRadius: BorderRadius.circular(HealthSpacing.radiusSm),
           border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
@@ -77,6 +83,7 @@ class _AlertBannerState extends State<AlertBanner> with SingleTickerProviderStat
             Expanded(child: Text(widget.message, style: HealthTypography.body(color: HealthColors.inkPrimary))),
           ],
         ),
+      ),
       ),
     );
   }

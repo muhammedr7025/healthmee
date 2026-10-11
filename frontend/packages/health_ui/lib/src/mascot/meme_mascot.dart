@@ -10,7 +10,9 @@ import 'mascot_state.dart';
 ///
 /// Renders the real illustrated artwork (one PNG per [MascotState]) rather
 /// than a procedural drawing, with a slow float-and-tilt loop matching the
-/// mockup's `mimiFloat` keyframe animation.
+/// mockup's `mimiFloat` keyframe animation. A mood change cross-fades rather
+/// than snapping. Below 40px the float is skipped: a dozen thread avatars
+/// each running a ticker adds up, and the motion isn't visible at that size.
 class MemeMascot extends StatefulWidget {
   const MemeMascot({super.key, required this.state, this.size = 96});
 
@@ -54,15 +56,28 @@ class _MemeMascotState extends State<MemeMascot> with SingleTickerProviderStateM
     // default bilinear — the real fix is higher-resolution exports.
     final image = Image.asset(
       'assets/mascot/${_assetNames[widget.state]}.png',
+      key: ValueKey(widget.state),
       package: 'health_ui',
       width: widget.size,
       height: widget.size,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
+      semanticLabel: 'MeMe, ${_assetNames[widget.state]}',
     );
-    final sized = SizedBox(width: widget.size, height: widget.size, child: image);
+    final sized = SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: reduceMotion
+          ? image
+          : AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: image,
+            ),
+    );
 
-    if (reduceMotion) return sized;
+    if (reduceMotion || widget.size < 40) return sized;
 
     return AnimatedBuilder(
       animation: _controller,

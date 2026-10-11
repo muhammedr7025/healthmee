@@ -59,7 +59,7 @@ class ChatMessages(MethodView):
     @blp.arguments(ChatHistoryQuerySchema, location="query")
     @blp.response(200, ChatHistorySchema)
     def get(self, args):
-        return get_chat_history(get_jwt_identity(), args["limit"])
+        return get_chat_history(get_jwt_identity(), args["limit"], before=args.get("before"))
 
     @jwt_required()
     @blp.arguments(ChatMessageSchema)

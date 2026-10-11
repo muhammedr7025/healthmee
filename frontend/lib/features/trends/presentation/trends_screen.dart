@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 import 'package:intl/intl.dart';
@@ -50,7 +49,6 @@ class TrendsScreen extends ConsumerWidget {
 
   void _switchView(WidgetRef ref, String view) {
     if (ref.read(_trendsViewProvider) == view) return;
-    HapticFeedback.selectionClick();
     ref.read(analyticsProvider).track('trends_view', {'view': view});
     ref.read(_trendsViewProvider.notifier).state = view;
   }
@@ -62,7 +60,7 @@ class TrendsScreen extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: asyncTrends.when(
+        child: asyncTrends.when(skipLoadingOnReload: true, 
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Padding(
             padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -70,20 +68,7 @@ class TrendsScreen extends ConsumerWidget {
           ),
           data: (trends) {
             if (trends.days.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(HealthSpacing.xl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const MemeMascot(state: MascotState.happy, size: 96),
-                      const SizedBox(height: HealthSpacing.md),
-                      Text('Log a few days and trends will start showing up here.',
-                          style: HealthTypography.mascotSpeech(), textAlign: TextAlign.center),
-                    ],
-                  ),
-                ),
-              );
+              return const EmptyState(message: 'Log a few days and trends will start showing up here.');
             }
             return Column(
               children: [
@@ -96,27 +81,10 @@ class TrendsScreen extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text('Last ${trends.days.length} days', style: HealthTypography.body(fontSize: 12, color: HealthColors.inkMuted)),
                       const SizedBox(height: 13),
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: HealthColors.chipIdle, borderRadius: BorderRadius.circular(14)),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _ViewTab(
-                                label: 'Charts',
-                                selected: view == 'charts',
-                                onTap: () => _switchView(ref, 'charts'),
-                              ),
-                            ),
-                            Expanded(
-                              child: _ViewTab(
-                                label: 'Read',
-                                selected: view == 'read',
-                                onTap: () => _switchView(ref, 'read'),
-                              ),
-                            ),
-                          ],
-                        ),
+                      SegmentedControl(
+                        segments: const [('charts', 'Charts'), ('read', 'Read')],
+                        selected: view,
+                        onChanged: (value) => _switchView(ref, value),
                       ),
                     ],
                   ),
@@ -125,34 +93,6 @@ class TrendsScreen extends ConsumerWidget {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class _ViewTab extends StatelessWidget {
-  const _ViewTab({required this.label, required this.selected, required this.onTap});
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? HealthColors.inkPrimary : Colors.transparent,
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(11),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          child: Center(
-            child: Text(
-              label,
-              style: HealthTypography.body(fontSize: 12.5, weight: FontWeight.w500, color: selected ? HealthColors.bgBase : HealthColors.inkMuted),
-            ),
-          ),
         ),
       ),
     );
@@ -188,18 +128,17 @@ class _TrendsBody extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, HealthSpacing.lg),
       children: [
         SizedBox(
-          height: 40,
+          height: 44,
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: _metrics
                 .map((m) => Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: _Pill(
+                      child: HealthChip(
                         label: m.label,
                         selected: m.key == selectedKey,
                         onTap: () {
                           if (m.key == selectedKey) return;
-                          HapticFeedback.selectionClick();
                           ref.read(analyticsProvider).track('metric_selected', {'metric': m.key, 'has_data': recentDays.any((d) => m.get(d) != null)});
                           ref.read(_selectedMetricProvider.notifier).state = m.key;
                         },
@@ -314,22 +253,7 @@ class _TrendsBody extends ConsumerWidget {
         ),
         if (trends.callouts.isNotEmpty) ...[
           const SizedBox(height: HealthSpacing.sm),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: HealthColors.reactionBubble,
-              border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.25)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const MemeMascot(state: MascotState.curious, size: 38),
-                const SizedBox(width: 12),
-                Expanded(child: Text(trends.callouts.first, style: HealthTypography.body(fontSize: 14, color: HealthColors.reactionText))),
-              ],
-            ),
-          ),
+          NudgeCard(text: trends.callouts.first),
         ],
         if (trends.callouts.length > 1) ...[
           const SizedBox(height: HealthSpacing.lg),
@@ -380,28 +304,17 @@ class _ReadView extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(HealthSpacing.md, HealthSpacing.md, HealthSpacing.md, 0),
-          child: Row(
-            children: _periods
-                .map((p) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 5),
-                        child: _ViewTab(
-                          label: p.$2,
-                          selected: period == p.$1,
-                          onTap: () {
-                            if (period == p.$1) return;
-                            HapticFeedback.selectionClick();
-                            ref.read(analyticsProvider).track('narrative_period', {'period': p.$1});
-                            ref.read(narrativePeriodProvider.notifier).state = p.$1;
-                          },
-                        ),
-                      ),
-                    ))
-                .toList(),
+          child: SegmentedControl(
+            segments: _periods,
+            selected: period,
+            onChanged: (value) {
+              ref.read(analyticsProvider).track('narrative_period', {'period': value});
+              ref.read(narrativePeriodProvider.notifier).state = value;
+            },
           ),
         ),
         Expanded(
-          child: asyncNarrative.when(
+          child: asyncNarrative.when(skipLoadingOnReload: true, 
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -514,9 +427,9 @@ class _ReadView extends ConsumerWidget {
                   _CalloutBox(
                     label: 'ACHIEVEMENTS',
                     labelColor: HealthColors.accentSecondary,
-                    bg: const Color(0xFFEEF0E2),
+                    bg: HealthColors.mossBg,
                     borderColor: HealthColors.accentSecondary.withValues(alpha: 0.35),
-                    textColor: const Color(0xFF3C4A33),
+                    textColor: HealthColors.mossInk,
                     items: narrative.achievements,
                     mascot: MascotState.celebrating,
                   ),
@@ -526,7 +439,7 @@ class _ReadView extends ConsumerWidget {
                   _CalloutBox(
                     label: 'WORTH SHOWING YOUR DOCTOR',
                     labelColor: HealthColors.accentPrimaryDark,
-                    bg: const Color(0xFFFDEEE4),
+                    bg: HealthColors.warnBg,
                     borderColor: HealthColors.accentPrimary.withValues(alpha: 0.3),
                     textColor: HealthColors.reactionText,
                     items: narrative.risks,
@@ -550,9 +463,9 @@ class _ReadView extends ConsumerWidget {
                   _CalloutBox(
                     label: 'GOING WELL',
                     labelColor: HealthColors.accentSecondary,
-                    bg: const Color(0xFFEEF0E2),
+                    bg: HealthColors.mossBg,
                     borderColor: HealthColors.accentSecondary.withValues(alpha: 0.35),
-                    textColor: const Color(0xFF3C4A33),
+                    textColor: HealthColors.mossInk,
                     items: narrative.wins,
                   ),
                 ],
@@ -561,7 +474,7 @@ class _ReadView extends ConsumerWidget {
                   _CalloutBox(
                     label: 'WORTH A LOOK',
                     labelColor: HealthColors.accentPrimaryDark,
-                    bg: const Color(0xFFFDEEE4),
+                    bg: HealthColors.warnBg,
                     borderColor: HealthColors.accentPrimary.withValues(alpha: 0.3),
                     textColor: HealthColors.reactionText,
                     items: narrative.watch,
@@ -573,7 +486,7 @@ class _ReadView extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          HapticFeedback.lightImpact();
+                          Haptics.commit();
                           ref.read(analyticsProvider).track('ask_meme_tapped', {'period': period, 'risks': narrative.risks.length});
                           ref.read(pendingChatMessageProvider.notifier).state =
                               'Explain my ${period == 'today' ? "today's" : "$period's"} summary';
@@ -733,32 +646,6 @@ class _CalloutBox extends StatelessWidget {
                 Expanded(child: body),
               ],
             ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.selected, required this.onTap});
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? HealthColors.inkPrimary : HealthColors.chipIdle,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(
-            label,
-            style: HealthTypography.body(fontSize: 12.5, weight: FontWeight.w500, color: selected ? HealthColors.bgBase : HealthColors.inkMuted),
-          ),
-        ),
-      ),
     );
   }
 }

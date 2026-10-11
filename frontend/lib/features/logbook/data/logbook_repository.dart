@@ -10,8 +10,8 @@ class LogbookRepository {
 
   final Dio _dio;
 
-  Future<List<LogEntryView>> fetchEntries({String? type, DateTime? start, DateTime? end}) async {
-    final params = <String, dynamic>{};
+  Future<List<LogEntryView>> fetchEntries({String? type, DateTime? start, DateTime? end, int page = 1, int perPage = 50}) async {
+    final params = <String, dynamic>{'page': page, 'per_page': perPage};
     if (type != null) params['type'] = type;
     // Sent as UTC with the Z suffix: a local time without an offset would be
     // read by the server as UTC, shifting "today" by the user's whole offset.
@@ -61,7 +61,58 @@ final logbookDayProvider = StateProvider<DateTime?>((ref) {
   return null;
 });
 
-final logbookEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((ref) {
+/// One page of the logbook plus whether older rows exist.
+class LogbookPage {
+  const LogbookPage({required this.items, required this.hasMore, this.loadingMore = false});
+  final List<LogEntryView> items;
+  final bool hasMore;
+  final bool loadingMore;
+
+  LogbookPage copyWith({List<LogEntryView>? items, bool? hasMore, bool? loadingMore}) =>
+      LogbookPage(items: items ?? this.items, hasMore: hasMore ?? this.hasMore, loadingMore: loadingMore ?? this.loadingMore);
+}
+
+/// Loads the logbook 50 rows at a time for the current tab/day/filter;
+/// "All days" used to fetch a person's entire history in one request.
+class LogbookPager extends StateNotifier<AsyncValue<LogbookPage>> {
+  LogbookPager(this._repo, {this.type, this.start, this.end}) : super(const AsyncLoading()) {
+    _loadFirst();
+  }
+
+  static const perPage = 50;
+  final LogbookRepository _repo;
+  final String? type;
+  final DateTime? start;
+  final DateTime? end;
+  int _page = 1;
+
+  Future<void> _loadFirst() async {
+    try {
+      _page = 1;
+      final items = await _repo.fetchEntries(type: type, start: start, end: end, page: 1, perPage: perPage);
+      state = AsyncData(LogbookPage(items: items, hasMore: items.length == perPage));
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
+
+  Future<void> refresh() => _loadFirst();
+
+  Future<void> loadMore() async {
+    final current = state.valueOrNull;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(current.copyWith(loadingMore: true));
+    try {
+      final more = await _repo.fetchEntries(type: type, start: start, end: end, page: _page + 1, perPage: perPage);
+      _page += 1;
+      state = AsyncData(LogbookPage(items: [...current.items, ...more], hasMore: more.length == perPage));
+    } catch (_) {
+      state = AsyncData(current.copyWith(loadingMore: false));
+    }
+  }
+}
+
+final logbookPagerProvider = StateNotifierProvider.autoDispose<LogbookPager, AsyncValue<LogbookPage>>((ref) {
   final tab = ref.watch(logbookTabProvider);
   final type = switch (tab) {
     'vitals' => 'vital',
@@ -71,7 +122,7 @@ final logbookEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((r
   final day = ref.watch(logbookDayProvider);
   final start = day == null ? null : DateTime(day.year, day.month, day.day);
   final end = start?.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
-  return ref.watch(logbookRepositoryProvider).fetchEntries(type: type, start: start, end: end);
+  return LogbookPager(ref.watch(logbookRepositoryProvider), type: type, start: start, end: end);
 });
 
 final todayEntriesProvider = FutureProvider.autoDispose<List<LogEntryView>>((ref) {

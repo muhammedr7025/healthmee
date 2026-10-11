@@ -48,3 +48,22 @@ def test_no_welcome_back_message_for_a_brand_new_thread(auth_client):
     data = resp.get_json()
     assert data["items"] == []
     assert data["welcome_back_message"] is None
+
+
+def test_history_pages_backwards_with_a_cursor(auth_client):
+    for i in range(6):
+        auth_client.post("/api/v1/chat/messages", json={"text": f"drank water {i}"})
+
+    first = auth_client.get("/api/v1/chat/messages?limit=4").get_json()
+    assert first["has_more"] is True
+    assert len(first["items"]) == 4
+    # Newest page: the last user message is the most recent one.
+    assert first["items"][-3]["text"] == "drank water 5" or any(i.get("text") == "drank water 5" for i in first["items"])
+
+    oldest = first["items"][0]["created_at"]
+    earlier = auth_client.get(f"/api/v1/chat/messages?limit=100&before={oldest}").get_json()
+    assert earlier["welcome_back_message"] is None  # the nudge only belongs on the newest page
+    assert all(i["created_at"] < oldest for i in earlier["items"])
+    texts = [i.get("text") for i in earlier["items"] if i["kind"] == "user_text"]
+    assert "drank water 0" in texts
+    assert earlier["has_more"] is False

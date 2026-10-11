@@ -120,9 +120,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ? GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => FocusScope.of(context).unfocus(),
-                      child: _EmptyState(
-                        historyFailed: chatState.historyFailed,
-                        onRetry: () => ref.read(chatControllerProvider.notifier).reloadHistory(),
+                      child: EmptyState(
+                        mascot: chatState.historyFailed ? MascotState.concerned : MascotState.happy,
+                        message: chatState.historyFailed
+                            ? "I couldn't load our conversation just now. Everything you've logged is safe on the server."
+                            : 'Nothing logged yet today — tell MeMe what you had for breakfast.',
+                        actionLabel: chatState.historyFailed ? 'Try again' : null,
+                        onAction: () => ref.read(chatControllerProvider.notifier).reloadHistory(),
                       ),
                     )
                   // Lazy and reversed: history restores up to a few hundred
@@ -147,7 +151,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           return Center(
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: HealthSpacing.sm),
-                              child: Text('YOUR THREAD WITH MEME', style: HealthTypography.label()),
+                              child: chatState.hasEarlier
+                                  ? (chatState.loadingEarlier
+                                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : TextButton(
+                                          onPressed: () => ref.read(chatControllerProvider.notifier).loadEarlier(),
+                                          child: Text('Load earlier messages', style: HealthTypography.body(fontSize: 12.5, color: HealthColors.accentPrimaryDark)),
+                                        ))
+                                  : Text('YOUR THREAD WITH MEME', style: HealthTypography.label()),
                             ),
                           );
                         }
@@ -214,42 +225,6 @@ class _ChatHeader extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({this.historyFailed = false, this.onRetry});
-
-  /// The thread couldn't be fetched — say so, rather than showing a "nothing
-  /// yet" that looks exactly like lost history.
-  final bool historyFailed;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(HealthSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            MemeMascot(state: historyFailed ? MascotState.concerned : MascotState.happy, size: 96),
-            const SizedBox(height: HealthSpacing.md),
-            Text(
-              historyFailed
-                  ? "I couldn't load our conversation just now. Everything you've logged is safe on the server."
-                  : 'Nothing logged yet today — tell MeMe what you had for breakfast.',
-              style: HealthTypography.mascotSpeech(),
-              textAlign: TextAlign.center,
-            ),
-            if (historyFailed) ...[
-              const SizedBox(height: HealthSpacing.sm),
-              TextButton(onPressed: onRetry, child: const Text('Try again')),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -359,8 +334,32 @@ class _ThreadItemView extends ConsumerWidget {
                   bottomRight: Radius.circular(6),
                 ),
                 child: item.photoBytes != null
-                    ? Image.memory(item.photoBytes!, width: 206, height: 206, fit: BoxFit.cover)
-                    : Image.network(item.photoUrl!, width: 206, height: 206, fit: BoxFit.cover),
+                    ? Image.memory(
+                        item.photoBytes!,
+                        width: 206,
+                        height: 206,
+                        fit: BoxFit.cover,
+                        // A 1600px capture decoded at bubble size, not full resolution.
+                        cacheWidth: (206 * MediaQuery.devicePixelRatioOf(context)).round(),
+                        gaplessPlayback: true,
+                      )
+                    : Image.network(
+                        item.photoUrl!,
+                        width: 206,
+                        height: 206,
+                        fit: BoxFit.cover,
+                        cacheWidth: (206 * MediaQuery.devicePixelRatioOf(context)).round(),
+                        loadingBuilder: (context, child, progress) => progress == null
+                            ? child
+                            : Container(width: 206, height: 206, color: HealthColors.chipIdle),
+                        errorBuilder: (context, error, stack) => Container(
+                          width: 206,
+                          height: 206,
+                          color: HealthColors.chipIdle,
+                          alignment: Alignment.center,
+                          child: Icon(Icons.broken_image_outlined, color: HealthColors.inkFaint),
+                        ),
+                      ),
               ),
               if (item.text != null) ...[
                 const SizedBox(height: 6),
@@ -434,7 +433,7 @@ class _ThreadItemView extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: item.alertHard ? const Color(0xFFFDEEE4) : HealthColors.reactionBubble,
+                  color: item.alertHard ? HealthColors.warnBg : HealthColors.reactionBubble,
                   border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.35)),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),

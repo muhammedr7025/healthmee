@@ -116,7 +116,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: const Color(0xFFEEF0E2),
+                color: HealthColors.mossBg,
                 border: Border.all(color: HealthColors.accentSecondary.withValues(alpha: 0.4)),
                 borderRadius: BorderRadius.circular(18),
               ),
@@ -183,7 +183,7 @@ class _PastReportsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncReports = ref.watch(reportsListProvider);
-    return asyncReports.when(
+    return asyncReports.when(skipLoadingOnReload: true, 
       loading: () => const LinearProgressIndicator(),
       error: (e, _) => Text("Couldn't load past reports.", style: HealthTypography.body(color: HealthColors.inkMuted)),
       data: (reports) {
@@ -268,7 +268,7 @@ class _ContentChecklist extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncChecklist = ref.watch(_reportChecklistProvider);
 
-    return asyncChecklist.when(
+    return asyncChecklist.when(skipLoadingOnReload: true, 
       loading: () => const HealthCard(child: LinearProgressIndicator()),
       error: (e, _) => Text("Couldn't check what's available.", style: HealthTypography.body(color: HealthColors.inkMuted)),
       data: (data) {

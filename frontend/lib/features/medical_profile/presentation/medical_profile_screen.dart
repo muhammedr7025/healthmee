@@ -157,7 +157,7 @@ class _ProfileTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(HealthSpacing.md),
       children: [
-        asyncAllergies.when(
+        asyncAllergies.when(skipLoadingOnReload: true, 
           loading: () => const Padding(padding: EdgeInsets.only(bottom: HealthSpacing.lg), child: LinearProgressIndicator(minHeight: 3)),
           // Safety-critical: never vanish quietly. Say it failed and offer a retry.
           error: (e, _) => Padding(
@@ -176,7 +176,7 @@ class _ProfileTab extends ConsumerWidget {
                   padding: const EdgeInsets.all(15),
                   margin: const EdgeInsets.only(bottom: HealthSpacing.lg),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFDEEE4),
+                    color: HealthColors.warnBg,
                     border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.35)),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -224,7 +224,7 @@ class _ProfileTab extends ConsumerWidget {
         ],
         Text('CONDITIONS', style: HealthTypography.label()),
         const SizedBox(height: HealthSpacing.sm),
-        asyncProfile.when(
+        asyncProfile.when(skipLoadingOnReload: true, 
           loading: () => const LinearProgressIndicator(),
           error: (e, _) => Text('Not set up yet — complete onboarding first.', style: HealthTypography.body()),
           data: (profile) => profile.conditions.isEmpty
@@ -236,7 +236,7 @@ class _ProfileTab extends ConsumerWidget {
                 ),
         ),
         const SizedBox(height: HealthSpacing.lg),
-        asyncProfile.when(
+        asyncProfile.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (profile) => Column(
@@ -275,7 +275,7 @@ class _ProfileTab extends ConsumerWidget {
         const SizedBox(height: HealthSpacing.lg),
         Text('LAB HISTORY', style: HealthTypography.label()),
         const SizedBox(height: HealthSpacing.sm),
-        asyncLabResults.when(
+        asyncLabResults.when(skipLoadingOnReload: true, 
           loading: () => const LinearProgressIndicator(),
           error: (e, _) => Text('Could not load lab results.', style: HealthTypography.body()),
           data: (results) => results.isEmpty
@@ -385,7 +385,7 @@ class _TrackingTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncLabs = ref.watch(labResultsProvider);
 
-    return asyncLabs.when(
+    return asyncLabs.when(skipLoadingOnReload: true, 
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(HealthSpacing.lg),

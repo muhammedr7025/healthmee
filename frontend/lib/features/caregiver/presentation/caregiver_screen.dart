@@ -105,7 +105,7 @@ class _MyCaregiversTab extends ConsumerWidget {
         onPressed: () => _invite(context, ref),
         child: const Icon(Icons.person_add_alt_outlined),
       ),
-      body: asyncLinks.when(
+      body: asyncLinks.when(skipLoadingOnReload: true, 
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Padding(
           padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -208,7 +208,7 @@ class _InvitationsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncInvites = ref.watch(caregiverInvitationsProvider);
-    return asyncInvites.when(
+    return asyncInvites.when(skipLoadingOnReload: true, 
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Padding(
         padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -275,7 +275,7 @@ class _AccessTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncAccess = ref.watch(caregiverAccessProvider);
-    return asyncAccess.when(
+    return asyncAccess.when(skipLoadingOnReload: true, 
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Padding(
         padding: const EdgeInsets.all(HealthSpacing.lg),

@@ -81,7 +81,7 @@ class GoalsScreen extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
       body: SafeArea(
-        child: asyncGoals.when(
+        child: asyncGoals.when(skipLoadingOnReload: true, 
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (err, _) => Padding(
             padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -125,7 +125,7 @@ class _GoalsBody extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: HealthSpacing.md),
-        asyncTrends.when(
+        asyncTrends.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (trends) => _StreakCard(trends: trends),
@@ -154,7 +154,7 @@ class _GoalsBody extends ConsumerWidget {
         const SizedBox(height: HealthSpacing.lg),
         Text('MILESTONES', style: HealthTypography.label()),
         const SizedBox(height: HealthSpacing.sm),
-        asyncTrends.when(
+        asyncTrends.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (trends) => _MilestonesList(streak: computeStreak(trends)),
@@ -349,7 +349,7 @@ class _GoalProgress extends ConsumerWidget {
     switch (goal.type) {
       case 'calories':
         final asyncToday = ref.watch(todayAggregateProvider);
-        return asyncToday.when(
+        return asyncToday.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (today) {
@@ -360,7 +360,7 @@ class _GoalProgress extends ConsumerWidget {
         );
       case 'activity':
         final asyncTrends = ref.watch(trendsDataProvider);
-        return asyncTrends.when(
+        return asyncTrends.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (trends) {
@@ -373,7 +373,7 @@ class _GoalProgress extends ConsumerWidget {
         );
       case 'weight':
         final asyncProfile = ref.watch(medicalProfileProvider);
-        return asyncProfile.when(
+        return asyncProfile.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (profile) {
@@ -383,7 +383,7 @@ class _GoalProgress extends ConsumerWidget {
         );
       case 'blood_pressure':
         final asyncProfile = ref.watch(medicalProfileProvider);
-        return asyncProfile.when(
+        return asyncProfile.when(skipLoadingOnReload: true, 
           loading: () => const SizedBox.shrink(),
           error: (e, _) => const SizedBox.shrink(),
           data: (profile) {

@@ -147,7 +147,7 @@ class _EditEntrySheetState extends State<_EditEntrySheet> {
         HealthSpacing.lg,
         MediaQuery.viewInsetsOf(context).bottom + HealthSpacing.lg,
       ),
-      child: asyncTypes.when(
+      child: asyncTypes.when(skipLoadingOnReload: true, 
         loading: () => const SizedBox(height: 120, child: Center(child: CircularProgressIndicator())),
         error: (e, _) => Column(
           mainAxisSize: MainAxisSize.min,

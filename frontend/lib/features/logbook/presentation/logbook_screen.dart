@@ -83,7 +83,6 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
   }
 
   void _quickLog(String label, String draft) {
-    HapticFeedback.selectionClick();
     ref.read(analyticsProvider).track('quick_log_tap', {'template': label.toLowerCase()});
     ref.read(pendingChatDraftProvider.notifier).state = draft;
     ref.read(activeTabProvider.notifier).state = chatTabIndex;
@@ -102,37 +101,24 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
             children: [
               Text('Logbook', style: HealthTypography.display(fontSize: 27)),
               const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: HealthColors.chipIdle, borderRadius: BorderRadius.circular(14)),
-                child: Row(
-                  children: [
-                    for (final t in _tabs)
-                      Expanded(
-                        child: _SegTab(
-                          label: t.$2,
-                          selected: tab == t.$1,
-                          onTap: () {
-                            if (tab == t.$1) return;
-                            HapticFeedback.selectionClick();
-                            ref.read(analyticsProvider).track('logbook_tab', {'tab': t.$1});
-                            ref.read(logbookTabProvider.notifier).state = t.$1;
-                          },
-                        ),
-                      ),
-                  ],
-                ),
+              SegmentedControl(
+                segments: _tabs,
+                selected: tab,
+                onChanged: (value) {
+                  ref.read(analyticsProvider).track('logbook_tab', {'tab': value});
+                  ref.read(logbookTabProvider.notifier).state = value;
+                },
               ),
               const SizedBox(height: 10),
               SizedBox(
-                height: 34,
+                height: 44,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
                     for (final q in _quickLogs)
                       Padding(
                         padding: const EdgeInsets.only(right: 7),
-                        child: _QuickChip(label: q.$1, onTap: () => _quickLog(q.$1, q.$2)),
+                        child: HealthChip(label: q.$1, icon: Icons.add, outlined: true, selected: false, onTap: () => _quickLog(q.$1, q.$2)),
                       ),
                   ],
                 ),
@@ -152,71 +138,6 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
                     ),
                 },
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SegTab extends StatelessWidget {
-  const _SegTab({required this.label, required this.selected, required this.onTap});
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? HealthColors.inkPrimary : Colors.transparent,
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(11),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Center(
-            child: Text(
-              label,
-              style: HealthTypography.body(
-                fontSize: 12,
-                weight: FontWeight.w500,
-                color: selected ? HealthColors.bgBase : HealthColors.inkMuted,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickChip extends StatelessWidget {
-  const _QuickChip({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: HealthColors.surface,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          decoration: BoxDecoration(
-            border: Border.all(color: HealthColors.accentPrimary.withValues(alpha: 0.35)),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add, size: 13, color: HealthColors.accentPrimary),
-              const SizedBox(width: 3),
-              Text(label, style: HealthTypography.body(fontSize: 12, weight: FontWeight.w500, color: HealthColors.accentPrimaryDark)),
             ],
           ),
         ),
@@ -342,41 +263,23 @@ class _TimelineTab extends ConsumerWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 36,
+          height: 44,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            children: _typeFilters.map((f) {
-              final selected = activeFilter == f.$1;
-              return Padding(
-                padding: const EdgeInsets.only(right: 7),
-                child: GestureDetector(
-                  onTap: () {
-                    if (activeFilter == f.$1) return;
-                    HapticFeedback.selectionClick();
-                    ref.read(logbookTypeFilterProvider.notifier).state = f.$1;
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: selected ? HealthColors.inkPrimary : HealthColors.chipIdle,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      style: HealthTypography.body(
-                        fontSize: 12.5,
-                        weight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? HealthColors.bgBase : HealthColors.inkMuted,
-                      ),
-                      child: Text(f.$2),
-                    ),
+            children: [
+              for (final f in _typeFilters)
+                Padding(
+                  padding: const EdgeInsets.only(right: 7),
+                  child: HealthChip(
+                    label: f.$2,
+                    selected: activeFilter == f.$1,
+                    onTap: () {
+                      if (activeFilter == f.$1) return;
+                      ref.read(logbookTypeFilterProvider.notifier).state = f.$1;
+                    },
                   ),
                 ),
-              );
-            }).toList(),
+            ],
           ),
         ),
         const SizedBox(height: 10),
@@ -395,17 +298,21 @@ class _EntriesList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncEntries = ref.watch(logbookEntriesProvider);
+    final asyncPage = ref.watch(logbookPagerProvider);
     final tab = ref.watch(logbookTabProvider);
     final day = ref.watch(logbookDayProvider);
 
-    return asyncEntries.when(
+    return asyncPage.when(
+      skipLoadingOnReload: true,
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Padding(
-        padding: const EdgeInsets.all(HealthSpacing.lg),
-        child: AlertBanner(message: "Couldn't load the logbook.", hard: false),
+      error: (err, _) => EmptyState(
+        message: "Couldn't load the logbook.",
+        mascot: MascotState.concerned,
+        actionLabel: 'Try again',
+        onAction: () => ref.read(logbookPagerProvider.notifier).refresh(),
       ),
-      data: (entries) {
+      data: (page) {
+        final entries = page.items;
         final q = query.trim().toLowerCase();
         final filtered = q.isEmpty
             ? entries
@@ -423,35 +330,32 @@ class _EntriesList extends ConsumerWidget {
           return ListView(
             children: [
               ?header,
-              Padding(
-                padding: const EdgeInsets.all(HealthSpacing.xl),
-                child: Column(
-                  children: [
-                    const MemeMascot(state: MascotState.happy, size: 96),
-                    const SizedBox(height: HealthSpacing.md),
-                    Text(
-                      entries.isEmpty
-                          ? 'No $what ${day == null ? 'yet' : 'on this day'} — $hint'
-                          : 'No matches for "$query".',
-                      style: HealthTypography.mascotSpeech(),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+              EmptyState(
+                message: entries.isEmpty ? 'No $what ${day == null ? 'yet' : 'on this day'} — $hint' : 'No matches for "$query".',
               ),
             ],
           );
         }
 
+        // One extra row at the end for "Show older" while the server has more.
+        final showMore = page.hasMore && q.isEmpty;
         final list = NotificationListener<ScrollNotification>(
           onNotification: onScroll,
           child: MemoryTrailTimeline(
-            itemCount: filtered.length,
-            itemBuilder: (context, index) => _FocalRow(
-              tick: tick,
-              index: index,
-              child: _LogRow(entry: filtered[index]),
-            ),
+            itemCount: filtered.length + (showMore ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == filtered.length) {
+                return Center(
+                  child: page.loadingMore
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : TextButton(
+                          onPressed: () => ref.read(logbookPagerProvider.notifier).loadMore(),
+                          child: Text('Show older entries', style: HealthTypography.body(fontSize: 13, color: HealthColors.accentPrimaryDark)),
+                        ),
+                );
+              }
+              return _FocalRow(tick: tick, index: index, child: _LogRow(entry: filtered[index]));
+            },
           ),
         );
         if (header == null) return list;
@@ -468,7 +372,7 @@ class _LatestReadings extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final entries = ref.watch(logbookEntriesProvider).valueOrNull ?? const <LogEntryView>[];
+    final entries = ref.watch(logbookPagerProvider).valueOrNull?.items ?? const <LogEntryView>[];
     final latest = <String, LogEntryView>{};
     for (final e in entries) {
       final kind = '${e.payload['kind']}';
@@ -532,7 +436,7 @@ class _LabsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncLabs = ref.watch(labResultsProvider);
 
-    return asyncLabs.when(
+    return asyncLabs.when(skipLoadingOnReload: true, 
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(HealthSpacing.lg),
@@ -636,29 +540,38 @@ class _FocalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final focalChild = AnimatedBuilder(
+      animation: tick,
+      builder: (context, child) {
+        if (reduceMotion) return child!;
+        final focal = _focalAmount(context);
+        // Rows comfortably in view skip the opacity layer entirely — that's
+        // most rows, most of the time, and each layer is a saveLayer.
+        if (focal >= 0.995) return child!;
+        return Opacity(
+          opacity: _minOpacity + (1 - _minOpacity) * focal,
+          child: Transform.scale(
+            scale: _minScale + (1 - _minScale) * focal,
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+    if (reduceMotion) return focalChild;
     return TweenAnimationBuilder<double>(
       // Staggered entrance — capped so a long list doesn't crawl in.
       duration: Duration(milliseconds: 320 + math.min(index, 8) * 45),
       curve: Curves.easeOutCubic,
       tween: Tween(begin: 0, end: 1),
-      builder: (context, entrance, child) => Opacity(
-        opacity: entrance,
-        child: Transform.translate(offset: Offset(0, (1 - entrance) * 18), child: child),
-      ),
-      child: AnimatedBuilder(
-        animation: tick,
-        builder: (context, child) {
-          final focal = _focalAmount(context);
-          return Opacity(
-            opacity: _minOpacity + (1 - _minOpacity) * focal,
-            child: Transform.scale(
-              scale: _minScale + (1 - _minScale) * focal,
-              child: child,
+      builder: (context, entrance, child) => entrance >= 1
+          ? child!
+          : Opacity(
+              opacity: entrance,
+              child: Transform.translate(offset: Offset(0, (1 - entrance) * 18), child: child),
             ),
-          );
-        },
-        child: child,
-      ),
+      child: focalChild,
     );
   }
 
@@ -696,7 +609,7 @@ class _LogRowState extends ConsumerState<_LogRow> {
       context,
       MaterialPageRoute(builder: (_) => EntryDetailScreen(entry: widget.entry)),
     );
-    if (changed == true) ref.invalidate(logbookEntriesProvider);
+    if (changed == true) ref.read(logbookPagerProvider.notifier).refresh();
   }
 
   @override

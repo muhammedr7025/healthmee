@@ -49,12 +49,15 @@ class ChatHistoryQuerySchema(Schema):
     # Bounded: history is unbounded now that it persists, and each photo row
     # costs a presigned-URL signing call — an unbounded limit was a cheap way
     # to make the API do an arbitrary amount of work.
-    limit = fields.Integer(required=False, load_default=200, validate=validate.Range(min=1, max=500))
+    limit = fields.Integer(required=False, load_default=100, validate=validate.Range(min=1, max=500))
+    # created_at cursor: return rows older than this ("load earlier").
+    before = fields.DateTime(required=False, allow_none=True)
 
 
 class ChatHistorySchema(Schema):
     items = fields.List(fields.Dict(), dump_only=True)
     welcome_back_message = fields.String(dump_only=True, allow_none=True)
+    has_more = fields.Boolean(dump_only=True)
 
 
 class LogbookQuerySchema(Schema):

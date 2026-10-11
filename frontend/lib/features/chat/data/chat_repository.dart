@@ -23,14 +23,19 @@ class ChatExtractionResult {
 }
 
 class ChatHistoryResult {
-  const ChatHistoryResult({required this.items, required this.welcomeBackMessage});
+  const ChatHistoryResult({required this.items, required this.welcomeBackMessage, this.hasMore = false});
 
   final List<Map<String, dynamic>> items;
   final String? welcomeBackMessage;
 
+  /// Older rows exist beyond this page — "load earlier" passes the oldest
+  /// row's created_at as the cursor.
+  final bool hasMore;
+
   factory ChatHistoryResult.fromJson(Map<String, dynamic> json) => ChatHistoryResult(
         items: List<Map<String, dynamic>>.from(json['items'] as List? ?? []),
         welcomeBackMessage: json['welcome_back_message'] as String?,
+        hasMore: json['has_more'] as bool? ?? false,
       );
 }
 
@@ -39,8 +44,11 @@ class ChatRepository {
 
   final Dio _dio;
 
-  Future<ChatHistoryResult> fetchHistory() async {
-    final resp = await _dio.get('/chat/messages');
+  Future<ChatHistoryResult> fetchHistory({DateTime? before, int limit = 100}) async {
+    final resp = await _dio.get('/chat/messages', queryParameters: {
+      'limit': limit,
+      'before': ?before?.toUtc().toIso8601String(),
+    });
     return ChatHistoryResult.fromJson(resp.data as Map<String, dynamic>);
   }
 

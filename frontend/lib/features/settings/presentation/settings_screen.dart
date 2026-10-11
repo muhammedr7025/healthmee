@@ -189,7 +189,7 @@ class _RemindersCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncPrefs = ref.watch(notificationPreferencesProvider);
 
-    return asyncPrefs.when(
+    return asyncPrefs.when(skipLoadingOnReload: true, 
       loading: () => const HealthCard(child: LinearProgressIndicator()),
       error: (e, _) => Text("Couldn't load reminder settings.", style: HealthTypography.body(color: HealthColors.inkMuted)),
       data: (prefs) => Container(

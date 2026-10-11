@@ -30,13 +30,23 @@ class HealthApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: HealthTheme.light(),
       navigatorObservers: [AnalyticsRouteObserver(ref.watch(analyticsProvider))],
-      home: switch (auth.status) {
-        AuthStatus.checking => const _SplashScreen(),
-        AuthStatus.unauthenticated => const AuthGate(),
-        AuthStatus.offline => const _OfflineScreen(),
-        AuthStatus.authenticated =>
-          (auth.user?.onboardingCompleted ?? false) ? const AppShell() : const OnboardingScreen(),
-      },
+      // The big swaps (splash → welcome, login → onboarding → shell) fade
+      // through instead of cutting.
+      home: AnimatedSwitcher(
+        duration: MediaQueryData.fromView(View.of(context)).disableAnimations ? Duration.zero : const Duration(milliseconds: 240),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child: KeyedSubtree(
+          key: ValueKey('${auth.status}-${auth.user?.onboardingCompleted ?? false}'),
+          child: switch (auth.status) {
+            AuthStatus.checking => const _SplashScreen(),
+            AuthStatus.unauthenticated => const AuthGate(),
+            AuthStatus.offline => const _OfflineScreen(),
+            AuthStatus.authenticated =>
+              (auth.user?.onboardingCompleted ?? false) ? const AppShell() : const OnboardingScreen(),
+          },
+        ),
+      ),
     );
   }
 }

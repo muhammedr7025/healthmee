@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'health_colors.dart';
 import 'health_spacing.dart';
@@ -6,6 +7,13 @@ import 'health_typography.dart';
 
 class HealthTheme {
   HealthTheme._();
+
+  /// Call once at startup. The app bundles DM Sans, Newsreader and IBM Plex
+  /// Mono under assets/fonts, so google_fonts must never go to the network —
+  /// offline first launches rendered in the platform fallback face.
+  static void useBundledFonts() {
+    GoogleFonts.config.allowRuntimeFetching = false;
+  }
 
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
