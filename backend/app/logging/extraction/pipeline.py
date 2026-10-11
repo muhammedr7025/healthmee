@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -76,6 +77,20 @@ def _extract_with_fallback(
     return result, False
 
 
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _without_duplicate_question(reply: str, question: str | None) -> str:
+    """When the model returns a clarifying_question it tends to ask it in the
+    reply as well, whatever the prompt says — and the person would then see
+    two bubbles asking the same thing. Keep the statements, drop the
+    question sentences; the question bubble carries the ask."""
+    if not question or not reply:
+        return reply
+    kept = [s for s in _SENTENCE_SPLIT.split(reply.strip()) if not s.rstrip().endswith("?")]
+    return " ".join(kept).strip()
+
+
 def _timestamp_for(extracted, now_local: datetime, tz_offset: int) -> datetime | None:
     """UTC timestamp for an entry the message dated ("yesterday", "for
     dinner"), or None to take the default (now).
@@ -133,6 +148,7 @@ def process_message(user: User, text: str, media_asset_id: str | None = None) ->
     now_local = local_now(tz_offset)
     user_context = build_user_context(user, now_local.date())
     result, degraded = _extract_with_fallback(user.id, text, image_bytes, image_mime_type, now_local, user_context)
+    result.reply = _without_duplicate_question(result.reply, result.question)
 
     created_entries: list[LogEntry] = []
     all_alerts = []

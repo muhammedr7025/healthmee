@@ -93,3 +93,14 @@ def test_export_covers_medicines_and_delete_sweeps_storage(auth_client, app, mon
     monkeypatch.setattr("app.accounts.data_service.delete_objects", lambda keys: swept.extend(keys))
     assert auth_client.delete("/api/v1/auth/me").status_code == 204
     assert swept == ["photo/x.jpg"]
+
+
+def test_question_is_not_asked_twice():
+    from app.logging.extraction.pipeline import _without_duplicate_question as dedupe
+
+    reply = "Morning BP 120 noted. Could you also share the diastolic number so I can log the full reading?"
+    assert dedupe(reply, "What was the lower number?") == "Morning BP 120 noted."
+    # No clarifying question: a conversational question in the reply is fine and stays.
+    assert dedupe("Logged the donut. How is your Sunday shaping up?", None) == "Logged the donut. How is your Sunday shaping up?"
+    # A reply that was only the question leaves the question bubble to carry it.
+    assert dedupe("What was the lower number?", "What was the lower number?") == ""
