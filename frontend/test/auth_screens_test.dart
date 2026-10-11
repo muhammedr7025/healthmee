@@ -40,6 +40,7 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextField, 'Email'), 'new@example.com');
     await tester.enterText(find.widgetWithText(TextField, 'Password'), 'supersecret1');
+    await tester.pump(); // the button enables once the form is valid
     await tester.tap(find.text('Create account'));
     await tester.pump();
 

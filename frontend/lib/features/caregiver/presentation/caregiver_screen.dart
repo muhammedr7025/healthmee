@@ -43,7 +43,16 @@ class _MyCaregiversTab extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Their email')),
+            TextField(
+              controller: emailController,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(labelText: 'Their email'),
+            ),
             const SizedBox(height: HealthSpacing.md),
             ValueListenableBuilder(
               valueListenable: canViewLogs,
@@ -75,7 +84,12 @@ class _MyCaregiversTab extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              if (emailController.text.trim().isEmpty) return;
+              final email = emailController.text.trim();
+              if (!email.contains('@') || !email.contains('.')) {
+                Haptics.error();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('That doesn\'t look like an email address.')));
+                return;
+              }
               try {
                 await ref.read(caregiverRepositoryProvider).invite(
                       email: emailController.text.trim(),
@@ -85,7 +99,11 @@ class _MyCaregiversTab extends ConsumerWidget {
                     );
                 if (context.mounted) Navigator.pop(context, true);
               } catch (_) {
-                if (context.mounted) Navigator.pop(context, false);
+                // Keep the dialog open and say what happened, instead of closing on them.
+                Haptics.error();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't send that invite — check the address and your connection.")));
+                }
               }
             },
             child: const Text('Send invite'),

@@ -70,6 +70,10 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
+                autofocus: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(hintText: 'DELETE'),
                 onChanged: (_) => setDialogState(() {}),
               ),

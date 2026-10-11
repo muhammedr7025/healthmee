@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:health_ui/health_ui.dart';
 
 /// Forgot-password flow. There's no universal-link/deep-link setup in this
@@ -29,6 +30,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _newPasswordController = TextEditingController();
   _ResetStage _stage = _ResetStage.idle;
   bool _submitting = false;
+  bool _showNewPassword = false;
   String? _error;
 
   @override
@@ -115,6 +117,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  autofillHints: const [AutofillHints.username, AutofillHints.email],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submitting ? null : _sendCode(),
                   decoration: const InputDecoration(labelText: 'Email on your account', hintText: 'you@email.com'),
                 ),
                 const SizedBox(height: HealthSpacing.md),
@@ -151,13 +158,27 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 TextField(
                   controller: _codeController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '6-digit code', hintText: '123456'),
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: '6-digit code', hintText: '123456', counterText: ''),
                 ),
                 const SizedBox(height: HealthSpacing.sm),
                 TextField(
                   controller: _newPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'New password', hintText: 'At least 8 characters'),
+                  obscureText: !_showNewPassword,
+                  autofillHints: const [AutofillHints.newPassword],
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submitting ? null : _confirm(),
+                  decoration: InputDecoration(
+                    labelText: 'New password',
+                    hintText: 'At least 8 characters',
+                    suffixIcon: TextButton(
+                      onPressed: () => setState(() => _showNewPassword = !_showNewPassword),
+                      child: Text(_showNewPassword ? 'Hide' : 'Show'),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: HealthSpacing.md),
                 SizedBox(

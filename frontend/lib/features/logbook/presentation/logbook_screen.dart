@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -53,6 +54,16 @@ class LogbookScreen extends ConsumerStatefulWidget {
 
 class _LogbookScreenState extends ConsumerState<LogbookScreen> {
   final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+
+  /// Filtering re-runs on every keystroke otherwise; 250ms after the last
+  /// one is indistinguishable to the user and far cheaper.
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) ref.read(_searchQueryProvider.notifier).state = value;
+    });
+  }
 
   /// Bumped on every scroll frame so each row can re-evaluate where it sits
   /// in the viewport and scale/fade accordingly.
@@ -65,6 +76,7 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _scrollTick.dispose();
     super.dispose();
@@ -133,6 +145,7 @@ class _LogbookScreenState extends ConsumerState<LogbookScreen> {
                   'symptoms' => _EntriesList(tick: _scrollTick, onScroll: _onScroll),
                   _ => _TimelineTab(
                       searchController: _searchController,
+                      onSearchChanged: _onSearchChanged,
                       tick: _scrollTick,
                       onScroll: _onScroll,
                     ),
@@ -222,8 +235,9 @@ class _DayNavigator extends ConsumerWidget {
 }
 
 class _TimelineTab extends ConsumerWidget {
-  const _TimelineTab({required this.searchController, required this.tick, required this.onScroll});
+  const _TimelineTab({required this.searchController, required this.onSearchChanged, required this.tick, required this.onScroll});
   final TextEditingController searchController;
+  final ValueChanged<String> onSearchChanged;
   final ValueNotifier<int> tick;
   final bool Function(ScrollNotification) onScroll;
 
@@ -249,7 +263,8 @@ class _TimelineTab extends ConsumerWidget {
               Expanded(
                 child: TextField(
                   controller: searchController,
-                  onChanged: (v) => ref.read(_searchQueryProvider.notifier).state = v,
+                  onChanged: onSearchChanged,
+                  textInputAction: TextInputAction.search,
                   decoration: const InputDecoration(
                     hintText: 'Search your logbook…',
                     border: InputBorder.none,
@@ -257,6 +272,20 @@ class _TimelineTab extends ConsumerWidget {
                   ),
                   style: HealthTypography.body(fontSize: 13.5),
                 ),
+              ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: searchController,
+                builder: (context, value, _) => value.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Clear search',
+                        icon: Icon(Icons.close, size: 16, color: HealthColors.inkMuted),
+                        onPressed: () {
+                          searchController.clear();
+                          onSearchChanged('');
+                        },
+                      ),
               ),
             ],
           ),

@@ -30,6 +30,8 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
+  bool get _canSubmit => _emailController.text.contains('@') && _passwordController.text.length >= 8;
+
   Future<void> _submit() async {
     setState(() {
       _submitting = true;
@@ -90,15 +92,27 @@ class _SignupScreenState extends State<SignupScreen> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                enableSuggestions: false,
+                autofillHints: const [AutofillHints.username, AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(labelText: 'Email', hintText: 'you@email.com'),
               ),
               const SizedBox(height: HealthSpacing.sm),
               TextField(
                 controller: _passwordController,
                 obscureText: !_showPassword,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _canSubmit && !_submitting ? _submit() : null,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   hintText: 'At least 8 characters',
+                  // Inline, as they type — not a 422 from the server after the tap.
+                  errorText: _passwordController.text.isNotEmpty && _passwordController.text.length < 8
+                      ? '${8 - _passwordController.text.length} more character${8 - _passwordController.text.length == 1 ? '' : 's'} to go'
+                      : null,
                   suffixIcon: TextButton(
                     onPressed: () => setState(() => _showPassword = !_showPassword),
                     child: Text(_showPassword ? 'Hide' : 'Show'),
@@ -112,7 +126,7 @@ class _SignupScreenState extends State<SignupScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
+                  onPressed: _submitting || !_canSubmit ? null : _submit,
                   child: Text(_submitting ? 'Please wait…' : 'Create account'),
                 ),
               ),

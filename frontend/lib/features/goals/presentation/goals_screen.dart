@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
@@ -43,7 +44,9 @@ class GoalsScreen extends ConsumerWidget {
             ),
             TextField(
               controller: valueController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+              textInputAction: TextInputAction.done,
               decoration: const InputDecoration(labelText: 'Target value'),
             ),
           ],
@@ -52,13 +55,24 @@ class GoalsScreen extends ConsumerWidget {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              final value = double.tryParse(valueController.text);
-              if (value == null) return;
-              await ref.read(goalsRepositoryProvider).createGoal(
-                    type: typeController.value,
-                    targetValue: {'value': value},
-                  );
-              if (context.mounted) Navigator.pop(context, true);
+              final value = double.tryParse(valueController.text.replaceAll(',', '.'));
+              if (value == null) {
+                Haptics.error();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a number for the target.')));
+                return;
+              }
+              try {
+                await ref.read(goalsRepositoryProvider).createGoal(
+                      type: typeController.value,
+                      targetValue: {'value': value},
+                    );
+                if (context.mounted) Navigator.pop(context, true);
+              } catch (_) {
+                Haptics.error();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't save the goal — check your connection and try again.")));
+                }
+              }
             },
             child: const Text('Add'),
           ),

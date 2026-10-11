@@ -29,6 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  bool get _canSubmit => _emailController.text.contains('@') && _passwordController.text.isNotEmpty;
+
   Future<void> _submit() async {
     setState(() {
       _submitting = true;
@@ -77,12 +79,21 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                enableSuggestions: false,
+                autofillHints: const [AutofillHints.username, AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(labelText: 'Email', hintText: 'you@email.com'),
               ),
               const SizedBox(height: HealthSpacing.sm),
               TextField(
                 controller: _passwordController,
                 obscureText: !_showPassword,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _canSubmit && !_submitting ? _submit() : null,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   suffixIcon: TextButton(
@@ -101,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
+                  onPressed: _submitting || !_canSubmit ? null : _submit,
                   child: Text(_submitting ? 'Please wait…' : 'Sign in'),
                 ),
               ),

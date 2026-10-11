@@ -43,26 +43,63 @@ class _ProfileTab extends ConsumerWidget {
 
   Future<void> _addAllergy(BuildContext context, WidgetRef ref) async {
     final nameController = TextEditingController();
+    final severity = ValueNotifier<String>('severe');
     final added = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add allergy'),
-        content: TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(labelText: 'Name', hintText: 'Peanuts, penicillin, lactose…'),
+              ),
+              const SizedBox(height: HealthSpacing.md),
+              Text('HOW SERIOUS', style: HealthTypography.label()),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final level in const ['mild', 'moderate', 'severe'])
+                    HealthChip(
+                      label: level,
+                      selected: severity.value == level,
+                      onTap: () => setDialogState(() => severity.value = level),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.trim().isEmpty) return;
-              await ref
-                  .read(medicalProfileRepositoryProvider)
-                  .addAllergy(name: nameController.text.trim(), severity: 'severe');
-              if (context.mounted) Navigator.pop(context, true);
+              try {
+                await ref
+                    .read(medicalProfileRepositoryProvider)
+                    .addAllergy(name: nameController.text.trim(), severity: severity.value);
+                if (context.mounted) Navigator.pop(context, true);
+              } catch (_) {
+                Haptics.error();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't save that allergy — check your connection and try again.")));
+                }
+              }
             },
             child: const Text('Add'),
           ),
         ],
       ),
     );
+    nameController.dispose();
     if (added == true) ref.invalidate(allergiesProvider);
   }
 
@@ -72,15 +109,28 @@ class _ProfileTab extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add medication'),
-        content: TextField(controller: nameController, decoration: const InputDecoration(labelText: 'e.g. Metformin 500mg')),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(labelText: 'e.g. Metformin 500mg'),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) return;
-              await ref.read(medicalProfileRepositoryProvider).updateProfile(medications: [...current, name]);
-              if (context.mounted) Navigator.pop(context, true);
+              try {
+                await ref.read(medicalProfileRepositoryProvider).updateProfile(medications: [...current, name]);
+                if (context.mounted) Navigator.pop(context, true);
+              } catch (_) {
+                Haptics.error();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't save that — check your connection and try again.")));
+                }
+              }
             },
             child: const Text('Add'),
           ),
@@ -122,9 +172,24 @@ class _ProfileTab extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: testController, decoration: const InputDecoration(labelText: 'Test name')),
-            TextField(controller: valueController, decoration: const InputDecoration(labelText: 'Value')),
-            TextField(controller: unitController, decoration: const InputDecoration(labelText: 'Unit (optional)')),
+            TextField(
+              controller: testController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Test name', hintText: 'HbA1c, fasting glucose…'),
+            ),
+            TextField(
+              controller: valueController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Value'),
+            ),
+            TextField(
+              controller: unitController,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(labelText: 'Unit (optional)', hintText: 'mg/dL, %, mmol/L'),
+            ),
           ],
         ),
         actions: [
@@ -132,13 +197,20 @@ class _ProfileTab extends ConsumerWidget {
           ElevatedButton(
             onPressed: () async {
               if (testController.text.trim().isEmpty || valueController.text.trim().isEmpty) return;
-              await ref.read(medicalProfileRepositoryProvider).addLabResult(
-                    testName: testController.text.trim(),
-                    value: valueController.text.trim(),
-                    unit: unitController.text.trim().isEmpty ? null : unitController.text.trim(),
-                    takenAt: DateTime.now(),
-                  );
-              if (context.mounted) Navigator.pop(context, true);
+              try {
+                await ref.read(medicalProfileRepositoryProvider).addLabResult(
+                      testName: testController.text.trim(),
+                      value: valueController.text.trim(),
+                      unit: unitController.text.trim().isEmpty ? null : unitController.text.trim(),
+                      takenAt: DateTime.now(),
+                    );
+                if (context.mounted) Navigator.pop(context, true);
+              } catch (_) {
+                Haptics.error();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Couldn't save that value — check your connection and try again.")));
+                }
+              }
             },
             child: const Text('Add'),
           ),

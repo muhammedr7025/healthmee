@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_ui/health_ui.dart';
 
@@ -465,6 +466,8 @@ class _NameStepState extends State<_NameStep> {
           TextField(
             controller: _nameController,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.givenName],
             decoration: const InputDecoration(labelText: 'Your name', hintText: 'Anand'),
             onChanged: widget.controller.setFullName,
           ),
@@ -603,7 +606,7 @@ class _VitalField extends StatefulWidget {
     required this.draft,
     required this.controller,
     this.hint,
-    this.keyboardType = TextInputType.number,
+    this.keyboardType = const TextInputType.numberWithOptions(decimal: true),
   });
 
   final String label;
@@ -634,14 +637,19 @@ class _VitalFieldState extends State<_VitalField> {
 
   @override
   Widget build(BuildContext context) {
+    final numeric = widget.keyboardType != TextInputType.text;
     return TextField(
       controller: _textController,
       keyboardType: widget.keyboardType,
+      // Decimal keypad on iOS (plain `number` has no "." key) and only digits
+      // get through — "72.5" used to be stored as the string "72.5".
+      inputFormatters: numeric ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))] : null,
       textInputAction: TextInputAction.next,
       decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
       onChanged: (v) {
-        if (widget.keyboardType == TextInputType.number) {
-          widget.controller.updateVital(widget.vitalKey, int.tryParse(v) ?? v);
+        if (numeric) {
+          final parsed = double.tryParse(v.replaceAll(',', '.'));
+          widget.controller.updateVital(widget.vitalKey, parsed ?? (v.isEmpty ? null : v));
         } else {
           widget.controller.updateVital(widget.vitalKey, v);
         }
@@ -716,6 +724,8 @@ class _AllergiesStepState extends State<_AllergiesStep> {
               Expanded(
                 child: TextField(
                   controller: _customController,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(hintText: 'e.g. Brinjal, sulphites, ajinomoto'),
                   onSubmitted: (_) => _addCustom(),
                 ),
@@ -772,6 +782,8 @@ class _MedicationsStepState extends State<_MedicationsStep> {
               Expanded(
                 child: TextField(
                   controller: _medController,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(hintText: 'e.g. Metformin 500mg, twice daily'),
                   onSubmitted: (_) => _add(),
                 ),
@@ -957,16 +969,30 @@ class _LabScanStepState extends ConsumerState<_LabScanStep> {
           const SizedBox(height: HealthSpacing.lg),
           Text('Or add one by hand', style: HealthTypography.label()),
           const SizedBox(height: HealthSpacing.sm),
-          TextField(controller: _testController, decoration: const InputDecoration(labelText: 'Test name (e.g. HbA1c)')),
+          TextField(
+            controller: _testController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Test name (e.g. HbA1c)'),
+          ),
           const SizedBox(height: HealthSpacing.sm),
           Row(
             children: [
               Expanded(
-                child: TextField(controller: _valueController, decoration: const InputDecoration(labelText: 'Value')),
+                child: TextField(
+                  controller: _valueController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(labelText: 'Value'),
+                ),
               ),
               const SizedBox(width: HealthSpacing.sm),
               Expanded(
-                child: TextField(controller: _unitController, decoration: const InputDecoration(labelText: 'Unit (optional)')),
+                child: TextField(
+                  controller: _unitController,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(labelText: 'Unit (optional)'),
+                ),
               ),
             ],
           ),
